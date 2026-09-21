@@ -7,7 +7,7 @@ export const HOLES = [
   { id: 5, x: 15, z: 12, color: '#ed819f', name: 'The far side' },
   { id: 6, x: 0, z: 7, color: '#7dba60', name: 'The happy return' },
 ];
-export const MILL = { x: -1, z: -1, hubY: 3.4, radius: 3.05, speed: 1.05 };
+export const MILL = { x: -1, z: -1, hubY: 3.4, radius: 3.05, headOffsetX: .6, speed: 1.05 };
 export const START = { x: -13, z: 17 };
 export const nextHole = index => (index + 1) % HOLES.length;
 export function tubePoints(index) {
@@ -15,7 +15,7 @@ export function tubePoints(index) {
   return [[a.x,.85,a.z],[a.x,-1.1,a.z],[a.x+dx*.18-dz/len*bend*2,-4.4,a.z+dz*.18+dx/len*bend*2],[(a.x+b.x)/2-dz/len*bend*3,-5-index*.13,(a.z+b.z)/2+dx/len*bend*3],[b.x-dx*.18-dz/len*bend*2,-4.4,b.z-dz*.18+dx/len*bend*2],[b.x,-1.1,b.z],[b.x,.85,b.z]];
 }
 export function clubHeads(time) {
-  return Array.from({length:4},(_,i)=>{const a=time*MILL.speed+i*Math.PI/2;return{x:MILL.x+.32*Math.cos(a)-MILL.radius*Math.sin(a),y:MILL.hubY+.32*Math.sin(a)+MILL.radius*Math.cos(a),z:MILL.z};});
+  return Array.from({length:4},(_,i)=>{const a=time*MILL.speed+i*Math.PI/2;return{x:MILL.x+MILL.headOffsetX*Math.cos(a)-MILL.radius*Math.sin(a),y:MILL.hubY+MILL.headOffsetX*Math.sin(a)+MILL.radius*Math.cos(a),z:MILL.z};});
 }
 export function createState(){return{x:START.x,z:START.z,y:.08,mode:'walk',ride:null,flight:null,blockedHole:null,cooldown:0,visited:new Set([1]),rides:0,launches:0,jumpY:0,jumpV:0};}
 export function canEnter(state,index){return state.mode==='walk'&&state.cooldown<=0&&state.blockedHole!==index&&state.jumpY<.15;}

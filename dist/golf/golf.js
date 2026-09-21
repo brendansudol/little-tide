@@ -51,12 +51,56 @@ for(let i=0;i<HOLES.length;i++){
 }
 // Paths are short stepping stones so all six greens remain freely walkable.
 for(let i=0;i<HOLES.length;i++){const a=HOLES[i],b=HOLES[nextHole(i)];for(let j=1;j<8;j++){const t=j/8,x=THREE.MathUtils.lerp(a.x,b.x,t),z=THREE.MathUtils.lerp(a.z,b.z,t);if(HOLES.some(h=>Math.hypot(x-h.x,z-h.z)<5.6))continue;const p=mesh(new THREE.CylinderGeometry(.52,.57,.09,8),cream,surface,x,.07,z);p.rotation.y=range(0,3);}}
-// Four giant putters form the windmill rotor. The same angles drive its collisions.
+// Four oversized irons spin grip-first around the hub, with their offset heads at the tips.
 const mill=new THREE.Group();mill.position.set(MILL.x,0,MILL.z-1.1);surface.add(mill);
 mesh(new THREE.CylinderGeometry(.85,1.4,3.7,10),cream,mill,0,1.85,0);mesh(new THREE.ConeGeometry(1.6,1.6,10),coral,mill,0,4.35,0);mesh(new THREE.BoxGeometry(.6,1.1,.08),dark,mill,0,.57,1.17);
 const rotor=new THREE.Group();rotor.position.set(MILL.x,MILL.hubY,MILL.z);surface.add(rotor);
-const clubMetal=mat('#b7d4d1',{metalness:.6,roughness:.25}),clubHeadMat=mat('#285d6d',{metalness:.3,roughness:.3});
-for(let i=0;i<4;i++){const club=new THREE.Group();club.rotation.z=i*Math.PI/2;rotor.add(club);mesh(new THREE.CylinderGeometry(.09,.07,2.9,8),clubMetal,club,0,1.55,0);mesh(new THREE.CylinderGeometry(.14,.14,.8,8),dark,club,0,.52,0);const head=mesh(new THREE.BoxGeometry(1.2,.48,.64),clubHeadMat,club,.32,MILL.radius,0);head.rotation.z=.12;mesh(new THREE.BoxGeometry(.9,.04,.65),cream,club,.35,MILL.radius+.25,0);}
+const clubMetal=mat('#dbe5e5',{metalness:.58,roughness:.24});
+const clubEdge=mat('#96abb4',{metalness:.48,roughness:.3});
+const clubFace=mat('#ecf0ec',{metalness:.32,roughness:.36});
+const clubGrip=mat('#273d42',{roughness:.95});
+const gripWrap=mat('#607979',{roughness:.9});
+const faceGroove=mat('#546b70',{metalness:.2,roughness:.6});
+// Rounded toe, narrow heel and sloping top line: an iron silhouette, not a centered mallet.
+const ironOutline=new THREE.Shape();
+ironOutline.moveTo(-.1,-.12);
+ironOutline.quadraticCurveTo(-.14,-.25,.08,-.31);
+ironOutline.lineTo(.95,-.52);
+ironOutline.quadraticCurveTo(1.25,-.57,1.32,-.35);
+ironOutline.lineTo(1.30,.02);
+ironOutline.quadraticCurveTo(1.27,.22,1.04,.23);
+ironOutline.quadraticCurveTo(.48,.24,.12,.15);
+ironOutline.quadraticCurveTo(-.08,.11,-.1,-.12);
+const ironGeometry=new THREE.ExtrudeGeometry(ironOutline,{depth:.16,bevelEnabled:true,bevelThickness:.045,bevelSize:.045,bevelSegments:3,curveSegments:14,steps:1});
+const ironFaceGeometry=new THREE.ShapeGeometry(ironOutline,14);
+for(let i=0;i<4;i++){
+  const club=new THREE.Group();club.rotation.z=i*Math.PI/2;rotor.add(club);
+  // Long, tapered chrome shaft and a dark rubber grip with spiral wrap and end cap.
+  mesh(new THREE.CylinderGeometry(.047,.068,2.63,12),clubMetal,club,0,1.48,0);
+  mesh(new THREE.CylinderGeometry(.092,.115,.88,12),clubGrip,club,0,.66,0);
+  mesh(new THREE.CylinderGeometry(.123,.123,.055,12),cream,club,0,.205,0);
+  mesh(new THREE.CylinderGeometry(.098,.098,.06,12),coral,club,0,1.08,0);
+  const wrap=[];
+  for(let j=0;j<=160;j++){const t=j/160,a=t*Math.PI*16,r=.113-t*.02;wrap.push(new THREE.Vector3(Math.cos(a)*r,.25+t*.8,Math.sin(a)*r));}
+  tube(new THREE.CatmullRomCurve3(wrap),.01,gripWrap,club,160);
+  // The bent hosel joins the shaft to the heel, leaving almost all of the blade on one side.
+  const hosel=new THREE.CatmullRomCurve3([new THREE.Vector3(0,2.47,0),new THREE.Vector3(-.025,2.64,.005),new THREE.Vector3(.055,2.82,.035),new THREE.Vector3(.15,2.93,.07)]);
+  tube(hosel,.072,clubMetal,club,18);
+  mesh(new THREE.CylinderGeometry(.073,.073,.14,12),clubGrip,club,0,2.49,0);
+  const iron=new THREE.Group();iron.position.set(0,MILL.radius,0);iron.rotation.x=-.2;club.add(iron);
+  mesh(ironGeometry,clubEdge,iron);
+  mesh(ironFaceGeometry,clubFace,iron,0,0,.211);
+  // Parallel score lines on the lofted striking face stay legible while the iron spins.
+  for(let row=0;row<5;row++){
+    const y=-.31+row*.095;
+    mesh(new THREE.BoxGeometry(.83,.018,.009),faceGroove,iron,.73,y,.219);
+  }
+  // A recessed back and thin raised sole make the club recognizable from behind, too.
+  const back=mesh(ironFaceGeometry,clubMetal,iron,.035,-.035,-.052);back.rotation.y=Math.PI;
+  back.scale.set(-.82,.75,1);
+  mesh(new THREE.BoxGeometry(.65,.13,.035),dark,iron,.72,-.13,-.071);
+  mesh(new THREE.BoxGeometry(.36,.026,.008),cream,iron,.72,-.13,-.092);
+}
 ball(rotor,gold,0,0,.25,.31,.31,.2);
 const launchMark=mesh(new THREE.CircleGeometry(1.15,36),coral,surface,MILL.x,.12,MILL.z);launchMark.rotation.x=-Math.PI/2;
 const launchArrow=sign('STAND HERE',MILL.x,.14,MILL.z+.35,2.15,'#fff4d4',null);launchArrow.rotation.x=-Math.PI/2;
