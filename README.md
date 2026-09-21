@@ -1,10 +1,12 @@
 # Little Tide
 
-Three playful 3D worlds to explore in your browser, built with Three.js.
+Four playful 3D worlds to explore in your browser, built with Three.js.
 
 - **[Beach World](https://brendansudol.github.io/little-tide/)** — walk along the shore, swim with shrimp, and pet friendly stingrays.
 - **[Candy World](https://brendansudol.github.io/little-tide/candy/)** — explore lollipop forests and bounce on marshmallows.
 - **[Impossible Golf](https://brendansudol.github.io/little-tide/golf/)** — six holes connected by underground tubes, with a spinning golf-club windmill that sends you flying.
+
+- **[Pepperoni Panic](https://brendansudol.github.io/little-tide/pepperoni/)** — slide across tomato sauce on a giant pizza while pepperoni walls close in and open again.
 
 ## Play
 
@@ -23,7 +25,7 @@ Open http://localhost:5173/ in a browser with WebGL enabled.
 ## Check game logic
 
 ```sh
-node --test tests/golf.test.mjs
+node --test tests/*.test.mjs
 ```
 
 ## Deployment
