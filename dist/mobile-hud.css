@@ -1,0 +1,94 @@
+.mobile-detail-toggle, .touch-help { display: none; }
+@media (max-width: 700px), (max-width: 1100px) and (max-height: 520px), (max-width: 1100px) and (pointer: coarse) {
+  header {
+    top: calc(12px + env(safe-area-inset-top));
+    left: calc(16px + env(safe-area-inset-left));
+    right: calc(16px + env(safe-area-inset-right));
+    z-index: 10;
+  }
+  .brand { gap: 8px; }
+  .brand-mark { width: 36px; height: 36px; font-size: 31px; border-radius: 12px; }
+  .brand h1 { font-size: clamp(18px, 4.8vw, 24px); letter-spacing: -.7px; white-space: nowrap; }
+  .brand p, .intro, .weather, .controls, .footer-note, .map-label, .creature-label { display: none; }
+  .world-menu { position: relative; top: auto; right: auto; font-size: 13px; }
+  .world-menu summary { min-height: 44px; display: flex; align-items: center; padding: 10px 14px; }
+  .world-menu nav {
+    top: 52px; width: min(250px, calc(100vw - 32px - env(safe-area-inset-left) - env(safe-area-inset-right)));
+    max-height: calc(100dvh - 84px - env(safe-area-inset-top) - env(safe-area-inset-bottom));
+    overflow-y: auto; overscroll-behavior: contain;
+  }
+  .world-menu a { min-height: 44px; display: flex; align-items: center; }
+  header .tools .menu-control, header .tools .mobile-detail-toggle {
+    display: block; width: 100%; height: auto; min-height: 44px; padding: 12px;
+    text-align: left; border: 0; border-radius: 10px; background: transparent;
+    font-size: 13px; color: inherit; margin: 0;
+  }
+  header .tools .menu-control { font-size: 0; }
+  header .tools .menu-control > * { display: none !important; }
+  header .tools .menu-control::after { content: attr(aria-label); font-size: 13px; }
+  header .tools .menu-control:hover, header .tools .mobile-detail-toggle:hover { background: #e6edcd; }
+  .mobile-detail-toggle { border-top: 1px solid #194e4420 !important; }
+  .minimap, .field-notes, .course-card { display: none; }
+  .mobile-details-open .minimap {
+    display: block; top: calc(76px + env(safe-area-inset-top)); bottom: auto;
+    right: calc(20px + env(safe-area-inset-right)); width: 88px; height: 88px; border-width: 3px;
+  }
+  .mobile-details-open .field-notes, .mobile-details-open .course-card {
+    display: block; top: calc(176px + env(safe-area-inset-top)); bottom: auto;
+    right: calc(16px + env(safe-area-inset-right)); width: 164px; padding: 12px; border-radius: 15px;
+  }
+  .notes-title { font-size: 7px; margin-bottom: 8px; letter-spacing: .5px; }
+  .friend { gap: 7px; margin-top: 9px; }
+  .friend strong { font-size: 11px; }
+  .friend small { font-size: 9px; }
+  .animal-icon { width: 26px; height: 28px; font-size: 23px; }
+  .course-title { font-size: 8px; letter-spacing: .5px; }
+  .course-title > span:first-child { max-width: none; }
+  .hole-chips { display: flex; gap: 3px; margin-top: 10px; }
+  .hole-chips span { width: 21px; height: 26px; font-size: 11px; }
+  .course-card p { display: none; }
+  footer { left: 0; right: 0; bottom: 0; pointer-events: none; }
+  footer .interact {
+    position: fixed; left: auto; right: calc(16px + env(safe-area-inset-right));
+    bottom: calc(100px + env(safe-area-inset-bottom)); transform: none;
+    min-width: 0; width: auto; max-width: calc(100vw - 145px - env(safe-area-inset-left) - env(safe-area-inset-right));
+    min-height: 48px; padding: 12px 16px; border-radius: 24px; pointer-events: auto;
+  }
+  footer .interact:not(.ready), .candy-world footer .interact,
+  .interact small, .interact-icon, .action-key { display: none; }
+  .interact strong { font-size: 13px; }
+  #mobile-controls { display: block; }
+  #joystick {
+    position: fixed; width: 96px; height: 96px;
+    left: calc(20px + env(safe-area-inset-left)); bottom: calc(24px + env(safe-area-inset-bottom));
+    border: 1px solid #fffdfbcc; border-radius: 50%; background: #fffbe466; touch-action: none;
+  }
+  #stick {
+    position: absolute; width: 40px; height: 40px; left: 27px; top: 27px;
+    border: 1px solid #ffffffcf; border-radius: 50%; background: #fffbe6cc;
+    pointer-events: none; box-shadow: 0 3px 10px #27544d15;
+  }
+  #jump {
+    position: fixed; left: auto; right: calc(20px + env(safe-area-inset-right));
+    bottom: calc(24px + env(safe-area-inset-bottom)); width: 60px; height: 60px;
+    border: 1px solid #ffffffcf; border-radius: 50%; background: #fffbe6d9;
+    font-size: 28px; touch-action: none;
+  }
+  #toast { top: calc(72px + env(safe-area-inset-top)); max-width: calc(100% - 32px); width: max-content; font-size: 11px; white-space: normal; text-align: center; padding: 10px 15px; }
+  #ride-banner { top: calc(72px + env(safe-area-inset-top)); width: auto; min-width: 210px; max-width: calc(100% - 32px); padding: 12px 18px; border-radius: 16px; }
+  #ride-banner > span { display: none; }
+  #ride-banner strong { margin: 0; font-size: 17px; }
+  .ride-track { margin-top: 8px; }
+  body.riding #toast { opacity: 0; }
+  dialog { width: min(90%, 450px); max-height: calc(100dvh - 32px - env(safe-area-inset-top) - env(safe-area-inset-bottom)); padding: 28px; overflow-y: auto; }
+  dialog h2 { font-size: 25px; padding-right: 10px; }
+  dialog dl { display: none; }
+  .touch-help { display: block; }
+  #close-help { width: 44px; height: 44px; top: 4px; right: 7px; }
+}
+@media (max-width: 1100px) and (max-height: 520px) {
+  .mobile-details-open .minimap { right: calc(16px + env(safe-area-inset-right)); }
+  .mobile-details-open .field-notes, .mobile-details-open .course-card {
+    top: calc(76px + env(safe-area-inset-top)); right: calc(116px + env(safe-area-inset-right));
+  }
+}
