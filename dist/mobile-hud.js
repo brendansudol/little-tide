@@ -47,6 +47,6 @@ compact.addEventListener('change', updateLayout);
 updateLayout();
 const touchHelp = document.createElement('p');
 touchHelp.className = 'touch-help';
-touchHelp.textContent = 'Use the joystick to move. Swipe the world to look around, pinch to zoom, and tap ↑ to jump. ' + (document.body.classList.contains('pepperoni-world') ? 'The sauce is slippery. Pepperoni gives you grip, and the walls gently nudge you inward.' : document.querySelector('#reset-camera') ? 'Walk onto marshmallows for an extra bounce.' : 'A button appears when a special action is nearby.');
+touchHelp.textContent = 'Use the joystick to move. Swipe the world to look around, pinch to zoom, and tap ↑ to jump. ' + (document.body.classList.contains('gym-world') ? 'Walk into a wall and keep pushing to climb. Pull away to climb down, or tap ↑ to let go. Get near a hoop to trigger the cannon.' : document.body.classList.contains('pepperoni-world') ? 'The sauce is slippery. Pepperoni gives you grip, and the walls gently nudge you inward.' : document.querySelector('#reset-camera') ? 'Walk onto marshmallows for an extra bounce.' : 'A button appears when a special action is nearby.');
 document.querySelector('#help-dialog dl').after(touchHelp);
 if (document.querySelector('#reset-camera')) document.body.classList.add('candy-world');
