@@ -1,6 +1,6 @@
 # Little Tide
 
-Five playful 3D worlds to explore in your browser, built with Three.js.
+Six playful 3D worlds to explore in your browser, built with Three.js.
 
 - **[Beach World](https://brendansudol.github.io/little-tide/)** — walk along the shore, swim with shrimp, and pet friendly stingrays.
 - **[Candy World](https://brendansudol.github.io/little-tide/candy/)** — explore lollipop forests and bounce on marshmallows.
@@ -9,6 +9,8 @@ Five playful 3D worlds to explore in your browser, built with Three.js.
 - **[Pepperoni Panic](https://brendansudol.github.io/little-tide/pepperoni/)** — slide across tomato sauce on a giant pizza while pepperoni walls close in and open again.
 
 - **[Triple Basket](https://brendansudol.github.io/little-tide/gym/)** — climb the gym walls and chase three moving hoops; a cannon scores a basket, then the ball bumps you back to the court.
+
+- **[Tissue World](https://brendansudol.github.io/little-tide/tissue/)** — drive a rolled-tissue car, cross a flowing tissue river, outrun Sniffles, and take a giant hand’s flick-and-catch ride.
 
 ## Play
 
