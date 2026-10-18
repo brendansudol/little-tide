@@ -1,6 +1,6 @@
 # Little Tide
 
-Six playful 3D worlds to explore in your browser, built with Three.js.
+Seven playful 3D worlds to explore in your browser, built with Three.js.
 
 - **[Beach World](https://brendansudol.github.io/little-tide/)** — walk along the shore, swim with shrimp, and pet friendly stingrays.
 - **[Candy World](https://brendansudol.github.io/little-tide/candy/)** — explore lollipop forests and bounce on marshmallows.
@@ -11,6 +11,8 @@ Six playful 3D worlds to explore in your browser, built with Three.js.
 - **[Triple Basket](https://brendansudol.github.io/little-tide/gym/)** — climb the gym walls and chase three moving hoops; a cannon scores a basket, then the ball bumps you back to the court.
 
 - **[Tissue World](https://brendansudol.github.io/little-tide/tissue/)** — drive a rolled-tissue car, cross a flowing tissue river, outrun Sniffles, and take a giant hand’s flick-and-catch ride.
+
+- **[Math World](https://brendansudol.github.io/little-tide/math/)** — meet six friendly 3D numbers, solve elementary math puzzles, and collect little prizes with confetti celebrations.
 
 ## Play
 
@@ -34,7 +36,7 @@ node --test tests/*.test.mjs
 
 ## Deployment
 
-GitHub Actions publishes `dist/` to GitHub Pages after each push to `main`. You can also run the deployment manually from the Actions tab. The workflow checks golf movement, tube routes, re-entry, and windmill launches before publishing.
+GitHub Actions publishes `dist/` to GitHub Pages after each push to `main`. You can also run the deployment manually from the Actions tab. The workflow checks game rules, including movement, rides, cannon shots, and math answers and rewards before publishing.
 
 The files use relative paths so the same site works at a domain root or beneath a repository path. `.openai/hosting.json` supports the separate OpenAI Sites deployment.
 
