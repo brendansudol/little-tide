@@ -1,5 +1,5 @@
 import * as THREE from '../vendor/three.module.js';
-import {STATIONS,DOUGH,MIXER,FLAVORS,TOPPINGS,TREATS,createState,nearby,taste,openOrder,serveCake,startCatch,stopCatch,returnHome,jump as jumpPlayer,tick,cookiePosition} from './rules.js';
+import {STATIONS,DOUGH,MIXER,FLAVORS,TOPPINGS,TREATS,createState,nearby,taste,openOrder,serveCake,startCatch,stopCatch,returnHome,jump as jumpPlayer,tick,cookiePosition} from './rules.js?v=mixer-1';
 const $=s=>document.querySelector(s),canvas=$('#world'),reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
 const scene=new THREE.Scene();scene.background=new THREE.Color('#b6d6c7');scene.fog=new THREE.Fog('#b6d6c7',65,120);
 let renderer;try{renderer=new THREE.WebGLRenderer({canvas,antialias:true});}catch(error){$('#loading').innerHTML='<p>Bakery World needs WebGL.<br>Try enabling hardware acceleration in your browser.</p>';throw error;}
