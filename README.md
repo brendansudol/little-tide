@@ -16,7 +16,7 @@ Nine playful 3D worlds to explore in your browser, built with Three.js.
 
 - **[Halloween World](https://brendansudol.github.io/little-tide/halloween/)** — explore a haunted house with friendly ghosts, jump over the scarecrow’s rolling pumpkins, and nibble a giant pumpkin pie.
 
-- **[Bakery World](https://brendansudol.github.io/little-tide/bakery/)** — become the head baker: catch flying cookies, decorate cakes to order, taste five pastries, and bounce on magical dough.
+- **[Bakery World](https://brendansudol.github.io/little-tide/bakery/)** — become the head baker: catch flying cookies, decorate cakes to order, taste five pastries, bounce on magical dough, and get whisked into the mixer for a flight out of the bakery.
 
 ## Play
 
