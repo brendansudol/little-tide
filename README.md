@@ -1,6 +1,6 @@
 # Little Tide
 
-Eight playful 3D worlds to explore in your browser, built with Three.js.
+Nine playful 3D worlds to explore in your browser, built with Three.js.
 
 - **[Beach World](https://brendansudol.github.io/little-tide/)** — walk along the shore, swim with shrimp, and pet friendly stingrays.
 - **[Candy World](https://brendansudol.github.io/little-tide/candy/)** — explore lollipop forests and bounce on marshmallows.
@@ -15,6 +15,8 @@ Eight playful 3D worlds to explore in your browser, built with Three.js.
 - **[Math World](https://brendansudol.github.io/little-tide/math/)** — meet six friendly 3D numbers, solve elementary math puzzles, and collect little prizes with confetti celebrations.
 
 - **[Halloween World](https://brendansudol.github.io/little-tide/halloween/)** — explore a haunted house with friendly ghosts, jump over the scarecrow’s rolling pumpkins, and nibble a giant pumpkin pie.
+
+- **[Beck’s World](https://brendansudol.github.io/little-tide/becks/)** — become the head baker: catch flying cookies, decorate cakes to order, taste five pastries, and bounce on magical dough.
 
 ## Play
 
