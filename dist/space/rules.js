@@ -23,16 +23,58 @@ export function position(s){return s.mode==='walk'?surface(PLANETS[s.planet],s.n
 export function monsterPosition(s){const right=cross(s.north,s.n);return add(surface(PLANETS[s.planet],s.n,3),add(mul(s.north,12),mul(right,-4)));}
 export function jump(s){if(s.mode==='walk'&&s.height===0){s.vy=7.5;s.height=.01;return true;}return false;}
 export function home(s){s.planet=2;s.n=[...UP];s.north=[0,0,-1];s.height=s.vy=0;s.mode='walk';s.ride=null;s.meteors=[];s.nextMeteor=10;s.event='Welcome home, space explorer!';}
-export function startFlight(s,destination){if(s.mode!=='walk'||!Number.isInteger(destination)||destination<0||destination>=PLANETS.length||destination===s.planet)return false;s.mode='flight';s.ride={time:0,from:s.planet,to:destination,startN:[...s.n],startHeight:s.height,position:surface(PLANETS[s.planet],s.n,s.height),phase:'lift'};s.meteors=[];s.vy=0;s.event=`Jetpack on! Next stop: ${PLANETS[destination].name}.`;return true;}
-export const FLIGHT_DURATION=6.6;
-export function flightPose(ride){const from=PLANETS[ride.from],to=PLANETS[ride.to];let t=ride.time;
- if(t<.8)return{phase:'lift',p:surface(from,ride.startN,ride.startHeight+(5-ride.startHeight)*smooth(t/.8)),up:ride.startN};
- t-=.8;if(t<1.2){const n=normalMix(ride.startN,UP,smooth(t/1.2));return{phase:'orbit',p:surface(from,n,5),up:n};}
- t-=1.2;if(t<3.6){const u=smooth(t/3.6),a=surface(from,UP,5),b=surface(to,UP,5),p=mix(a,b,u);p[1]+=Math.sin(u*Math.PI)*48;return{phase:'cruise',p,up:UP};}
- t-=3.6;return{phase:t>=1?'done':'land',p:surface(to,UP,5*(1-smooth(t))),up:UP};
+export const FLIGHT_SPEED=22;
+export function startFlight(s){
+ if(s.mode!=='walk')return false;
+ const from=position(s);s.mode='flight';s.ride={time:0,position:add(from,mul(s.n,.06)),velocity:[0,0,0],launchNormal:[...s.n],heading:[0,0,-1],landing:null};s.meteors=[];s.vy=0;s.event='Jetpack on! You’re the pilot. Aim, fly, and touch a planet to land.';return true;
 }
-function land(s,index){s.planet=index;s.n=[...UP];s.north=[0,0,-1];s.height=s.vy=0;s.facing=Math.PI;s.mode='walk';s.ride=null;s.meteors=[];s.nextMeteor=8;if(!s.visited.includes(index))s.visited.push(index);}
-export function knockIntoSun(s){if(s.mode!=='walk')return false;const start=position(s),hot=surface(SUN,unit(sub(start,SUN.p)),1.1);s.mode='sun';s.ride={time:0,phase:'knock',start,hot,home:s.planet,position:start};s.meteors=[];s.hits++;s.vy=0;s.event='BONK! New Moon sent you sunward!';return true;}
+export function landingTarget(s,maxClearance=Infinity){
+ if(s.mode!=='flight')return null;
+ const targets=PLANETS.map((p,index)=>({index,name:p.name,clearance:Math.max(0,length(sub(position(s),p.p))-p.r)})).sort((a,b)=>a.clearance-b.clearance);
+ return targets[0].clearance<=maxClearance?targets[0]:null;
+}
+export function requestLanding(s){const target=landingTarget(s,6);if(!target||s.ride.time<.8)return false;s.ride.landing=target.index;s.event=`Easy landing on ${target.name}. Move to cancel.`;return true;}
+function land(s,index,n=UP,northHint=[0,0,-1]){
+ s.planet=index;s.n=[...n];let north=sub(northHint,mul(n,dot(northHint,n)));if(length(north)<.01)north=cross(n,Math.abs(n[0])<.8?[1,0,0]:[0,0,1]);s.north=unit(north);s.height=s.vy=0;s.facing=Math.PI;s.mode='walk';s.ride=null;s.meteors=[];s.nextMeteor=8;s.padCooldown=1;if(!s.visited.includes(index))s.visited.push(index);
+}
+// Sweep the whole movement segment so a fast approach cannot pass through a planet.
+export function sphereContact(start,end,center,radius){
+ const offset=sub(start,center),delta=sub(end,start),a=dot(delta,delta),c=dot(offset,offset)-radius*radius;
+ if(c<=0)return 0;if(a<1e-12)return null;
+ const b=dot(offset,delta),d=b*b-a*c;if(d<0)return null;const t=(-b-Math.sqrt(d))/a;return t>=0&&t<=1?t:null;
+}
+function fly(s,dt,input){
+ const r=s.ride;r.time+=dt;
+ const direction=input.flight||[0,0,0],amount=length(direction),near=landingTarget(s);
+ if(input.heading&&length(input.heading)>.01)r.heading=unit(input.heading);
+ if(amount>.01)r.landing=null;
+ // Throttle down close to surfaces; let go to hover, without an endless drift.
+ const speed=near.clearance<8?7+15*clamp(near.clearance/8):FLIGHT_SPEED;
+ let wanted=mul(direction,speed/Math.max(1,amount));
+ if(r.landing!==null)wanted=mul(unit(sub(PLANETS[r.landing].p,r.position)),5);
+ if(r.time<.7)wanted=add(wanted,mul(r.launchNormal,12*(1-r.time/.7)));
+ const rate=amount>.01||r.landing!==null?6:10,decay=Math.exp(-rate*dt),old=r.velocity;
+ r.velocity=add(wanted,mul(sub(old,wanted),decay));
+ const next=add(r.position,add(mul(wanted,dt),mul(sub(old,wanted),(1-decay)/rate)));
+ let first=null;
+ for(const [index,p] of [...PLANETS,SUN].entries()){
+  if(index===s.planet&&r.time<.8)continue;
+  const t=sphereContact(r.position,next,p.p,p.r+(index===PLANETS.length?1.1:.12));
+  if(t!==null&&(!first||t<first.t))first={t,index,p};
+ }
+ if(first){
+  r.position=mix(r.position,next,first.t);
+  if(first.index===PLANETS.length){knockIntoSun(s,'sun');return;}
+  const n=unit(sub(r.position,first.p.p)),heading=r.heading,wasNew=!s.visited.includes(first.index);
+  land(s,first.index,n,heading);s.event=wasNew&&s.visited.length===8?'All eight planets! Rainbow jetpack unlocked!':`Touchdown on ${first.p.name}! Your boots are in charge.`;s.effect='arrival';return;
+ }
+ r.position=next;
+ if(r.time<.8){const p=PLANETS[s.planet],offset=sub(r.position,p.p);if(length(offset)<p.r+.13)r.position=surface(p,unit(offset),.13);}
+}
+export function knockIntoSun(s,cause='meteor'){
+ if(s.mode!=='walk'&&s.mode!=='flight')return false;
+ const start=position(s),hot=surface(SUN,unit(sub(start,SUN.p)),1.1);s.mode='sun';s.ride={time:cause==='sun'?2.2:0,phase:cause==='sun'?'hot':'knock',start,hot,home:s.planet,position:cause==='sun'?hot:start};s.meteors=[];if(cause==='meteor')s.hits++;s.vy=0;s.event=cause==='sun'?"Oh, that's hot, hot, hot!":'BONK! New Moon sent you sunward!';if(cause==='sun')s.effect='hot';return true;
+}
 export const SUN_DURATION=8;
 export function sunPose(ride){let t=ride.time;
  if(t<2.2){const u=smooth(t/2.2),n=unit(ride.hot),bend=unit(sub(UP,mul(n,dot(UP,n))));const arc=length(bend)<.01?[1,0,0]:bend;return{phase:'knock',p:add(mix(ride.start,ride.hot,u),mul(arc,Math.sin(u*Math.PI)*23))};}
@@ -42,7 +84,7 @@ export function sunPose(ride){let t=ride.time;
 export function meteorPosition(m){if(m.age<1.8)return m.from;const u=clamp((m.age-1.8)/1.4);return add(mix(m.from,m.target,u),mul(m.n,Math.sin(u*Math.PI)*4));}
 export function tick(s,dt,input={x:0,z:0}){
  s.time+=dt;s.event='';s.effect=null;
- if(s.mode==='flight'){const r=s.ride;r.time+=dt;const p=flightPose(r);r.position=p.p;r.up=p.up;r.phase=p.phase;if(p.phase==='done'){const to=r.to;land(s,to);s.event=s.visited.length===8?'All eight planets! Rainbow jetpack unlocked!':`Welcome to ${PLANETS[to].name}! ${PLANETS[to].tag}.`;s.effect='arrival';}return;}
+ if(s.mode==='flight'){fly(s,dt,input);return;}
  if(s.mode==='sun'){const r=s.ride,old=r.phase;r.time+=dt;const p=sunPose(r);r.position=p.p;r.phase=p.phase;if(p.phase==='hot'&&old!=='hot'){s.event="Oh, that's hot, hot, hot!";s.effect='hot';}if(p.phase==='rescue'&&old!=='rescue'){s.event='Cooling comet to the rescue!';s.effect='rescue';}if(p.phase==='done'){land(s,r.home);s.nextMeteor=12;s.event='Phew! Back on your planet. Your stardust is safe.';s.effect='arrival';}return;}
  const planet=PLANETS[s.planet],amount=Math.hypot(input.x,input.z);
  if(amount>.01){const right=cross(s.north,s.n),dir=unit(add(mul(right,input.x),mul(s.north,-input.z))),axis=unit(cross(s.n,dir)),angle=5.5*Math.min(1,amount)*dt/planet.r;s.n=unit(rotate(s.n,axis,angle));s.north=unit(rotate(s.north,axis,angle));s.facing=Math.atan2(input.x,-input.z);}
