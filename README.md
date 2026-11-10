@@ -1,6 +1,6 @@
 # Little Tide
 
-Ten playful 3D worlds to explore in your browser, built with Three.js.
+Eleven playful 3D worlds to explore in your browser, built with Three.js.
 
 - **[Beach World](https://brendansudol.github.io/little-tide/)** — walk along the shore, swim with shrimp, and pet friendly stingrays.
 - **[Candy World](https://brendansudol.github.io/little-tide/candy/)** — explore lollipop forests and bounce on marshmallows.
@@ -20,9 +20,13 @@ Ten playful 3D worlds to explore in your browser, built with Three.js.
 
 - **[Space World](https://brendansudol.github.io/little-tide/space/)** — steer your jetpack freely between eight walkable toy planets and touch down anywhere, collect stardust, dodge New Moon’s meteors, and take a silly, scorching detour to the sun. A cooling comet brings you safely back.
 
+- **[Car World](https://brendansudol.github.io/little-tide/car/)** — hop in a peach convertible, weave through a timed cone course, splash through mud and a bubbly car wash, wave to friendly drivers, and stop for a vegan breakfast sandwich. Hop out anytime to explore on foot.
+
 ## Play
 
 Use **WASD / arrow keys** to move, **drag** to look, **scroll / pinch** to zoom, and **Space** to jump. Press **E** for nearby interactions. On a phone, use the joystick, jump button, and contextual action button. Open **Menu** for controls, world navigation, and optional map/progress panels.
+
+In Car World, **W/S** accelerate and reverse, **A/D** steer, **Space** brakes, **E** enters/exits the car, and **H** honks or waves. On touch screens, push the joystick up/down to drive and left/right to steer.
 
 ## Run locally
 
