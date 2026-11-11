@@ -1,6 +1,8 @@
 // Car World simulation. Rendering and input devices share these same rules.
 export const clamp=(v,a,b)=>Math.max(a,Math.min(b,v));
 export const distance=(a,b)=>Math.hypot(a.x-b.x,a.z-b.z);
+// Walking and driving use the same screen-relative directions, even after orbiting the view.
+export function cameraDirection(x,y,yaw){return{x:x*Math.cos(yaw)+y*Math.sin(yaw),z:-x*Math.sin(yaw)+y*Math.cos(yaw)};}
 export const COURSE=[[-20,12],[-12,7],[-21,1],[-12,-5],[-20,-11],[-10,-15]].map(([x,z],i)=>({x,z,number:i+1}));
 export const CAFE={x:13,z:-8.2};
 export const WASH={x:27,entry:10,exit:-10.5,duration:9};
@@ -29,7 +31,7 @@ function move(body,dx,dz,r){const x=clamp(body.x+dx,-45+r,45-r),z=clamp(body.z+d
 function event(s,message,effect){s.event=message;s.effect=effect||null;}
 export function toggleCar(s){
  if(s.mode==='wash')return false;
- if(s.mode==='walk'){if(!nearCar(s))return false;s.mode='drive';s.car.speed=0;s.y=0;s.vy=0;event(s,'Buckle up! W / S to drive, A / D to steer.','enter');return true;}
+ if(s.mode==='walk'){if(!nearCar(s))return false;s.mode='drive';s.car.speed=0;s.y=0;s.vy=0;event(s,'Point where you want to go. Let go to stop!','enter');return true;}
  const c=s.car;
  for(const a of [c.yaw+Math.PI/2,c.yaw-Math.PI/2,c.yaw+Math.PI]){const x=c.x+Math.sin(a)*3,z=c.z+Math.cos(a)*3;if(blocked(x,z,.45)||s.npcs.some(n=>Math.hypot(x-n.x,z-n.z)<2.5))continue;s.x=x;s.z=z;s.y=0;s.vy=0;s.yaw=c.yaw;c.speed=0;s.mode='walk';if(s.course.active){s.course.active=false;s.course.next=0;event(s,'Course paused? Start again at gate 1 whenever you like.');}else event(s,'A little stroll. Press H to wave to a neighbor!');return true;}
  event(s,'A little more space, please! Move the car before hopping out.');return false;
@@ -47,13 +49,25 @@ export function tick(s,input,dt){
   const w=s.wash;w.time=Math.min(WASH.duration,w.time+dt);const t=w.time/WASH.duration,e=clamp(w.time,0,1);s.car.x=w.x+(WASH.x-w.x)*e;s.car.z=w.z+(WASH.exit-w.z)*t;s.car.yaw=w.yaw+(Math.PI-w.yaw)*e;s.car.dirt=w.dirt*(1-clamp((w.time-2)/4.5,0,1));s.car.speed=0;s.car.steer=0;
   if(w.time>=WASH.duration){s.washes++;if(w.dirt>.1)s.badges.clean=true;s.car.dirt=0;s.wash=null;s.mode='drive';event(s,'Sparkly clean! Go find another muddy adventure.','clean');}
  }else if(s.mode==='drive'){
-  const c=s.car,prev={x:c.x,z:c.z},throttle=clamp(input.throttle||0,-1,1),steer=clamp(input.steer||0,-1,1),mud=MUD.some(m=>((c.x-m.x)/m.rx)**2+((c.z-m.z)/m.rz)**2<1);
-  if(input.brake)c.speed=Math.sign(c.speed)*Math.max(0,Math.abs(c.speed)-22*dt);
-  else if(throttle)c.speed+=throttle*(Math.sign(throttle)!==Math.sign(c.speed)&&Math.abs(c.speed)>.1?20:10)*dt;
-  else c.speed=Math.sign(c.speed)*Math.max(0,Math.abs(c.speed)-3.4*dt);
-  c.speed=clamp(c.speed,mud?-4:-6,mud?9:15);c.steer+=(steer-c.steer)*Math.min(1,dt*9);c.yaw-=c.steer*1.65*clamp(Math.abs(c.speed)/5,0,1)*Math.sign(c.speed)*dt;
-  if(move(c,Math.sin(c.yaw)*c.speed*dt,Math.cos(c.yaw)*c.speed*dt,1.8))c.speed*=.3;
-  for(const n of s.npcs)if(distance(c,n)<3.7){c.x=prev.x;c.z=prev.z;c.speed=0;}
+  const c=s.car,prev={x:c.x,z:c.z},dx=input.x||0,dz=input.z||0,length=Math.hypot(dx,dz),mud=MUD.some(m=>((c.x-m.x)/m.rx)**2+((c.z-m.z)/m.rz)**2<1);
+  const pointing=length>.12&&!input.brake;
+  let wantedSpeed=0,steer=0;
+  if(pointing){
+   const direction=Math.atan2(dx,dz),error=Math.atan2(Math.sin(direction-c.yaw),Math.cos(direction-c.yaw));
+   // Turn even at a standstill. Tight turns slow automatically instead of swinging wide.
+   const turn=clamp(error*(1-Math.exp(-12*dt)),-8*dt,8*dt);c.yaw+=turn;steer=clamp(-turn/(8*dt||1),-1,1);
+   const alignment=Math.max(0,Math.cos(error-turn));
+   wantedSpeed=(mud?5.5:8.5)*clamp((length-.12)/.88,0,1)*alignment*alignment;
+   if(Math.abs(error)>.65)c.speed=Math.min(c.speed,wantedSpeed);
+   c.dx=dx/length;c.dz=dz/length;
+  }
+  const acceleration=wantedSpeed>c.speed?13:input.brake?65:42;
+  c.speed+=clamp(wantedSpeed-c.speed,-acceleration*dt,acceleration*dt);
+  c.steer+=(steer-c.steer)*(1-Math.exp(-12*dt));
+  move(c,(c.dx??Math.sin(c.yaw))*c.speed*dt,(c.dz??Math.cos(c.yaw))*c.speed*dt,1.65);
+  // Slide along walls, and always allow moving away from a close traffic car.
+  if(distance(c,prev)<1e-7)c.speed=0;
+  for(const n of s.npcs)if(distance(c,n)<3.5&&distance(c,n)<distance(prev,n)){c.x=prev.x;c.z=prev.z;c.speed=0;}
   const traveled=distance(c,prev);s.odometer+=traveled;if(mud&&traveled>.001){c.dirt=clamp(c.dirt+traveled*.085,0,1);if(!s.muddy)event(s,'Splish, splosh! The car wash knows what to do.','mud');}s.muddy=mud;
   const course=s.course;
   if(course.active)course.time+=dt;
@@ -64,7 +78,7 @@ export function tick(s,input,dt){
    else{course.next++;event(s,`Lovely driving! Next stop: gate ${course.next+1}.`,'gate');}
   }
   CONES.forEach((cone,i)=>{if(!s.cones[i]&&segmentDistance(cone,prev,c)<1.65&&traveled>.005){s.cones[i]=8;c.speed*=.75;if(course.active){course.penalty+=2;event(s,'Oops! A wobbly cone. +2 seconds, keep going!','cone');}}});
-  if(c.z<=WASH.entry&&prev.z>WASH.entry&&Math.abs(c.x-WASH.x)<2.2&&Math.cos(c.yaw)<-.7&&c.speed>0){
+  if(c.z<=WASH.entry&&prev.z>WASH.entry&&Math.abs(c.x-WASH.x)<2.8&&Math.cos(c.yaw)<-.3&&c.speed>0){
    // Normalize the angle so the entrance alignment takes the short turn.
    let yaw=c.yaw;while(yaw-Math.PI>Math.PI)yaw-=Math.PI*2;while(yaw-Math.PI< -Math.PI)yaw+=Math.PI*2;
    s.wash={time:0,dirt:c.dirt,x:c.x,z:c.z,yaw};s.mode='wash';s.course.active=false;s.course.next=0;event(s,'Welcome to Suds & Smiles. Sit back for the bubble ride!','wash');

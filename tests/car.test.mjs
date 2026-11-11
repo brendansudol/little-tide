@@ -1,30 +1,42 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {createState,tick,toggleCar,nearCar,jump,home,orderSandwich,eat,social,washPhase,COURSE,CONES,CAFE,WASH,TRACK_LENGTH,trafficPose,distance,clamp} from '../dist/car/rules.js';
+import {createState,tick,toggleCar,nearCar,jump,home,orderSandwich,eat,social,washPhase,COURSE,CONES,CAFE,WASH,TRACK_LENGTH,trafficPose,distance,cameraDirection} from '../dist/car/rules.js';
 const step=(s,seconds,input={},fps=60)=>{for(let i=0;i<Math.ceil(seconds*fps);i++)tick(s,input,1/fps);};
 const driver=()=>{const s=createState();assert.ok(toggleCar(s));return s;};
 test('Enter and safely exit the parked car; walk, jump, and keep progress on recovery',()=>{
  const s=createState();assert.ok(nearCar(s));assert.ok(toggleCar(s));assert.equal(s.mode,'drive');s.badges.breakfast=true;s.food=2;s.car.dirt=.8;assert.ok(toggleCar(s));assert.equal(s.mode,'walk');assert.ok(distance(s,s.car)>2.9);const parked={...s.car};step(s,1,{x:-1,z:0});assert.equal(s.car.x,parked.x);assert.equal(s.car.z,parked.z);assert.equal(toggleCar(s),false);assert.ok(jump(s));step(s,.3);assert.ok(s.y>1);step(s,1);assert.equal(s.y,0);home(s);assert.equal(s.food,2);assert.ok(s.badges.breakfast);assert.equal(s.car.dirt,.8);assert.equal(s.mode,'walk');assert.ok(nearCar(s));
  s.mode='drive';s.car.x=43;s.car.z=0;s.car.yaw=0;assert.ok(toggleCar(s));assert.ok(s.x<43); // A wall-side exit chooses the clear side.
 });
-test('Throttle, reversing, right steering, braking and solid boundaries work at 30/60/120 fps',()=>{
- for(const fps of [30,60,120]){const s=driver();s.npcs=[];step(s,1,{throttle:1},fps);assert.ok(s.car.z<16);const before=s.car.x;step(s,1,{throttle:1,steer:1},fps);assert.ok(s.car.x>before+2);step(s,1,{brake:true},fps);assert.equal(s.car.speed,0);const p={...s.car};step(s,1,{steer:1},fps);assert.equal(s.car.yaw,p.yaw);assert.equal(s.car.x,p.x);step(s,1,{throttle:-1},fps);assert.ok(s.car.speed<0);
- Object.assign(s.car,{x:40,z:0,yaw:Math.PI/2,speed:0,steer:0});step(s,4,{throttle:1},fps);assert.ok(s.car.x<=43.2);
- Object.assign(s.car,{x:13,z:-5,yaw:Math.PI,speed:0,steer:0});step(s,3,{throttle:1},fps);assert.ok(s.car.z>=-10.01);}
+test('A single direction starts and turns the car, including tight turnarounds, at 30/60/120 fps',()=>{
+ for(const fps of [30,60,120])for(const [x,z] of [[0,-1],[1,0],[0,1],[-1,0]]){const s=driver();s.npcs=[];const start={...s.car};step(s,1,{x,z},fps);assert.ok((s.car.x-start.x)*x+(s.car.z-start.z)*z>2);assert.ok(Math.abs((s.car.x-start.x)*z-(s.car.z-start.z)*x)<1e-6);assert.ok(s.car.speed<=8.5);const opposite={...s.car};step(s,1,{x:-x,z:-z},fps);assert.ok((s.car.x-opposite.x)*x+(s.car.z-opposite.z)*z< -2);}
+});
+test('Release stops within one car length, brake is quicker, and gentle joystick input creeps',()=>{
+ for(const fps of [30,60,120]){const s=driver();s.npcs=[];step(s,1,{z:-1},fps);const start={...s.car};step(s,.25,{},fps);assert.equal(s.car.speed,0);assert.ok(distance(start,s.car)<.9);const stopped={...s.car};step(s,1,{},fps);assert.equal(distance(stopped,s.car),0);
+ step(s,1,{z:-1},fps);const braking={...s.car};step(s,.15,{z:-1,brake:true},fps);assert.equal(s.car.speed,0);assert.ok(distance(braking,s.car)<.6);
+ step(s,1,{x:.05,z:-.05},fps);assert.equal(s.car.speed,0);const gentle=driver();gentle.npcs=[];step(gentle,1,{z:-.3},fps);assert.ok(gentle.car.speed>1&&gentle.car.speed<2);const diagonal=driver();diagonal.npcs=[];step(diagonal,1,{x:1,z:-1},fps);assert.ok(diagonal.car.speed<=8.5);}
+});
+test('Screen directions stay consistent at every camera angle and across opposite car headings',()=>{
+ for(const yaw of [0,Math.PI/2,Math.PI,-Math.PI/2])for(const [x,y] of [[1,0],[-1,0],[0,1],[0,-1]]){const s=driver();s.npcs=[];const start={...s.car},input=cameraDirection(x,y,yaw);step(s,1,input);const dx=s.car.x-start.x,dz=s.car.z-start.z,screenX=dx*Math.cos(yaw)-dz*Math.sin(yaw),screenY=dx*Math.sin(yaw)+dz*Math.cos(yaw);assert.ok(screenX*x+screenY*y>2);assert.ok(Math.abs(screenX*y-screenY*x)<1e-6);}
+});
+test('The car stops at walls, slides along them, and can turn away without reversing controls',()=>{
+ for(const fps of [30,60,120]){const s=driver();s.npcs=[];Object.assign(s.car,{x:40,z:0,yaw:Math.PI/2});step(s,4,{x:1},fps);assert.ok(s.car.x<=43.35);const edge=s.car.x;step(s,1,{x:-1},fps);assert.ok(s.car.x<edge-2);
+ Object.assign(s.car,{x:13,z:-5,yaw:Math.PI,speed:0});step(s,3,{z:-1},fps);assert.ok(s.car.z>=-10.16);const wall={...s.car};step(s,1,{x:1,z:-1},fps);assert.ok(s.car.x>wall.x+3);assert.ok(s.car.z>=-10.16);step(s,1,{z:1},fps);assert.ok(s.car.z>wall.z+2);}
 });
 test('Only moving cars collect mud; a complete continuous wash cleans and releases once',()=>{
- for(const fps of [30,60,120]){const s=driver();s.npcs=[];Object.assign(s.car,{x:7,z:14,yaw:Math.PI/2});step(s,1);assert.equal(s.car.dirt,0);step(s,1.4,{throttle:1},fps);assert.ok(s.car.dirt>.3);Object.assign(s.car,{x:27,z:12,yaw:Math.PI,speed:0,steer:0});for(let i=0;i<fps*3&&s.mode!=='wash';i++)tick(s,{throttle:1},1/fps);assert.equal(s.mode,'wash');assert.equal(toggleCar(s),false);const phases=new Set();let previous={...s.car};for(let i=0;i<fps*10&&s.mode==='wash';i++){phases.add(washPhase(s));tick(s,{},1/fps);assert.ok(distance(previous,s.car)<.15);assert.ok(s.car.dirt<=previous.dirt);previous={...s.car};}assert.equal(phases.size,4);assert.equal(s.mode,'drive');assert.equal(s.car.dirt,0);assert.ok(Math.abs(s.car.z-WASH.exit)<1e-8);assert.equal(s.washes,1);assert.ok(s.badges.clean);step(s,3);assert.equal(s.washes,1);}
+ for(const fps of [30,60,120]){const s=driver();s.npcs=[];Object.assign(s.car,{x:7,z:14,yaw:Math.PI/2});step(s,1);assert.equal(s.car.dirt,0);step(s,1.4,{x:1},fps);assert.ok(s.car.dirt>.3);Object.assign(s.car,{x:27,z:12,yaw:Math.PI,speed:0,steer:0});for(let i=0;i<fps*3&&s.mode!=='wash';i++)tick(s,{z:-1},1/fps);assert.equal(s.mode,'wash');assert.equal(toggleCar(s),false);const phases=new Set();let previous={...s.car};for(let i=0;i<fps*10&&s.mode==='wash';i++){phases.add(washPhase(s));tick(s,{},1/fps);assert.ok(distance(previous,s.car)<.15);assert.ok(s.car.dirt<=previous.dirt);previous={...s.car};}assert.equal(phases.size,4);assert.equal(s.mode,'drive');assert.equal(s.car.dirt,0);assert.ok(Math.abs(s.car.z-WASH.exit)<1e-8);assert.equal(s.washes,1);assert.ok(s.badges.clean);step(s,3);assert.equal(s.washes,1);}
  const s=createState();s.x=13;s.z=14;step(s,2,{x:1,z:0});assert.equal(s.car.dirt,0);
 });
-test('Clean washes do not grant the mud badge; reversing or entering sideways never starts a wash',()=>{
- const s=driver();s.npcs=[];Object.assign(s.car,{x:27,z:12,yaw:Math.PI});step(s,1,{throttle:1});assert.equal(s.mode,'wash');step(s,10);assert.equal(s.badges.clean,false);Object.assign(s.car,{x:27,z:12,yaw:0,speed:0});step(s,1,{throttle:-1});assert.equal(s.mode,'drive');Object.assign(s.car,{x:22,z:9,yaw:Math.PI/2,speed:0});step(s,1,{throttle:1});assert.equal(s.mode,'drive');Object.assign(s.car,{x:27,z:12,yaw:Math.PI,speed:0,dirt:1});step(s,1,{throttle:1});assert.equal(s.mode,'wash');home(s);step(s,10);assert.equal(s.washes,1);assert.equal(s.badges.clean,false);
+test('Clean washes do not grant the mud badge; the entrance assists diagonal approaches but not side entries',()=>{
+ const s=driver();s.npcs=[];Object.assign(s.car,{x:27,z:12,yaw:Math.PI});step(s,1,{z:-1});assert.equal(s.mode,'wash');step(s,10);assert.equal(s.badges.clean,false);
+ Object.assign(s.car,{x:22,z:9,yaw:Math.PI/2,speed:0});step(s,1,{x:1});assert.equal(s.mode,'drive');
+ Object.assign(s.car,{x:29.6,z:12,yaw:Math.PI,speed:0,dirt:1});step(s,1,{x:-.2,z:-1});assert.equal(s.mode,'wash');home(s);step(s,10);assert.equal(s.washes,1);assert.equal(s.badges.clean,false);
 });
-test('The slalom is drivable using throttle and steering, in order, at every frame rate',()=>{
- for(const fps of [30,60,120]){const s=driver();s.npcs=[];function reach(target){for(let i=0;i<fps*30;i++){const d=distance(s.car,target);if(d<1.5)return;const wanted=Math.atan2(target.x-s.car.x,target.z-s.car.z),error=Math.atan2(Math.sin(wanted-s.car.yaw),Math.cos(wanted-s.car.yaw));const desired=Math.abs(error)>.65?4:7;tick(s,{throttle:s.car.speed<desired?.6:0,steer:clamp(-error*2,-1,1)},1/fps);}assert.fail('Could not drive to '+JSON.stringify(target));}
- reach(COURSE[0]);assert.equal(s.course.next,1);for(let i=1;i<6;i++)reach(COURSE[i]);assert.equal(s.course.runs,1);assert.ok(s.badges.course);assert.ok(s.course.best>10&&s.course.best<90);assert.equal(s.course.best,s.course.last);}
+test('Pointing toward each gate completes the slalom without throttle, steering, or extra laps',()=>{
+ for(const fps of [30,60,120]){const s=driver();s.npcs=[];function reach(target){for(let i=0;i<fps*30;i++){const d=distance(s.car,target);if(d<1.5)return;tick(s,{x:(target.x-s.car.x)/d,z:(target.z-s.car.z)/d},1/fps);}assert.fail('Could not drive to '+JSON.stringify(target));}
+ reach(COURSE[0]);assert.equal(s.course.next,1);for(let i=1;i<6;i++)reach(COURSE[i]);assert.equal(s.course.runs,1);assert.ok(s.badges.course);assert.ok(s.course.best>5&&s.course.best<20);assert.equal(s.course.best,s.course.last);}
 });
 test('Walking and out-of-order gates cannot complete the course; cones penalize once per tumble',()=>{
- const s=createState();s.x=COURSE[0].x;s.z=COURSE[0].z;step(s,.1,{x:1});assert.equal(s.course.active,false);s.mode='drive';s.npcs=[];Object.assign(s.car,{x:COURSE[4].x,z:COURSE[4].z,yaw:0});step(s,.1,{throttle:1});assert.equal(s.course.active,false);s.course.active=true;s.course.next=1;Object.assign(s.car,{x:CONES[4].x,z:CONES[4].z+.3,yaw:Math.PI,speed:1});step(s,.2,{throttle:1});assert.equal(s.course.penalty,2);step(s,.2,{brake:true});assert.equal(s.course.penalty,2);assert.ok(s.cones[4]>0);toggleCar(s);assert.equal(s.course.active,false);assert.equal(s.course.runs,0);
+ const s=createState();s.x=COURSE[0].x;s.z=COURSE[0].z;step(s,.1,{x:1});assert.equal(s.course.active,false);s.mode='drive';s.npcs=[];Object.assign(s.car,{x:COURSE[4].x,z:COURSE[4].z,yaw:0});step(s,.1,{z:-1});assert.equal(s.course.active,false);s.course.active=true;s.course.next=1;Object.assign(s.car,{x:CONES[4].x,z:CONES[4].z+.3,yaw:Math.PI,speed:1});step(s,.2,{z:-1});assert.equal(s.course.penalty,2);step(s,.2,{brake:true});assert.equal(s.course.penalty,2);assert.ok(s.cones[4]>0);toggleCar(s);assert.equal(s.course.active,false);assert.equal(s.course.runs,0);
 });
 test('Café orders need the window and free hands; bites and repeat orders are safe',()=>{
  const s=createState();assert.equal(orderSandwich(s),false);Object.assign(s,CAFE);assert.ok(orderSandwich(s));assert.equal(s.food,3);assert.equal(s.orders,1);assert.ok(s.badges.breakfast);assert.equal(orderSandwich(s),false);assert.ok(eat(s));assert.equal(eat(s),false);step(s,.8);assert.ok(eat(s));step(s,.8);assert.ok(eat(s));assert.equal(s.food,0);assert.equal(eat(s),false);assert.ok(orderSandwich(s));assert.equal(s.orders,2);s.mode='drive';assert.equal(eat(s),false);assert.equal(orderSandwich(s),false);
