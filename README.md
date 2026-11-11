@@ -18,7 +18,7 @@ Eleven playful 3D worlds to explore in your browser, built with Three.js.
 
 - **[Bakery World](https://brendansudol.github.io/little-tide/bakery/)** — become the head baker: catch flying cookies, decorate cakes to order, taste five pastries, bounce on magical dough, and get whisked into the mixer for a flight out of the bakery.
 
-- **[Space World](https://brendansudol.github.io/little-tide/space/)** — steer your jetpack freely between eight walkable toy planets and touch down anywhere, collect stardust, dodge New Moon’s meteors, and take a silly, scorching detour to the sun. A cooling comet brings you safely back.
+- **[Space World](https://brendansudol.github.io/little-tide/space/)** — steer your jetpack freely between eight walkable toy planets and touch down anywhere, collect stardust, dodge New Moon’s meteors, and take a silly, scorching detour to the sun. A cooling comet brings you safely back. Fly to and land on New Moon to aim his asteroids at the sun: eight hits shrink it into darkness. Explore by helmet light, then bring back the sunshine to play again.
 
 - **[Car World](https://brendansudol.github.io/little-tide/car/)** — hop in a peach convertible, weave through a timed cone course, splash through mud and a bubbly car wash, wave to friendly drivers, and stop for a vegan breakfast sandwich. Hop out anytime to explore on foot.
 

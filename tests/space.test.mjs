@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {PLANETS,SUN,UP,createState,tick,position,startFlight,landingTarget,requestLanding,sphereContact,SUN_DURATION,knockIntoSun,sunPose,jump,home,surface,unit,length,sub,dot,starNormals,padNormal} from '../dist/space/rules.js';
+import {PLANETS,SUN,NEW_MOON,MOON_INDEX,SUN_HITS,sunRadius,sunIsOut,restoreSun,meteorPosition,UP,createState,tick,position,startFlight,landingTarget,requestLanding,sphereContact,SUN_DURATION,knockIntoSun,sunPose,jump,home,surface,unit,length,sub,dot,starNormals,padNormal} from '../dist/space/rules.js';
 function step(s,time,input={x:0,z:0},fps=60){for(let i=0;i<time*fps;i++)tick(s,1/fps,input);}
 function near(a,b,epsilon=1e-6){assert.ok(length(sub(a,b))<epsilon,`${a} versus ${b}`);}
 test('Walking follows each curved planet, crosses poles, and keeps an orthonormal movement frame',()=>{
@@ -38,4 +38,29 @@ test('A visible meteor can be dodged by walking or a well-timed jump at every fr
 });
 test('Stardust awards once, bounce pads work, and home cancels either ride without losing discoveries',()=>{
  const s=createState();s.nextMeteor=1000;s.n=starNormals[0];step(s,.1);assert.deepEqual(s.stars,['2:0']);step(s,.3);assert.equal(s.stars.length,1);s.n=padNormal;step(s,.1);assert.equal(s.bounces,1);assert.ok(s.vy>0);step(s,.5);assert.ok(s.height>3);home(s);startFlight(s);step(s,1);home(s);assert.equal(s.mode,'walk');assert.equal(s.planet,2);knockIntoSun(s);step(s,1);home(s);assert.equal(s.mode,'walk');assert.deepEqual(s.stars,['2:0']);near(position(s),surface(PLANETS[2],UP));
+});
+
+function flyToMoon(s,fps=60){
+ assert.ok(startFlight(s));
+ for(let i=0;i<fps*10&&s.mode==='flight';i++){const direction=unit(sub(NEW_MOON.p,position(s)));tick(s,1/fps,{flight:direction,heading:direction});}
+ assert.equal(s.mode,'walk');assert.equal(s.planet,MOON_INDEX);assert.ok(s.moonFriendly);
+}
+test('Fly directly from Earth to New Moon, walk his curved surface and take off again at every frame rate',()=>{
+ for(const fps of [30,60,120]){const s=createState();flyToMoon(s,fps);near(position(s),surface(NEW_MOON,s.n));assert.deepEqual(s.visited,[2]);const n=[...s.n];step(s,1,{x:1,z:0},fps);assert.ok(length(sub(n,s.n))>.5);assert.ok(Math.abs(dot(s.n,s.north))<1e-8);assert.equal(s.stars.length,0);assert.ok(jump(s));step(s,.4,undefined,fps);assert.ok(s.height>1);assert.ok(startFlight(s));step(s,1,{flight:s.n},fps);assert.equal(s.mode,'flight');}
+});
+test('New Moon accepts side, underside and assisted landings without duplicate planet rewards',()=>{
+ for(const n of [UP,[0,-1,0],[1,0,0],[0,0,1]]){const s=createState();startFlight(s);s.ride.time=2;s.ride.position=surface(NEW_MOON,n,3);assert.equal(landingTarget(s).index,MOON_INDEX);assert.ok(requestLanding(s));for(let i=0;i<180&&s.mode==='flight';i++)tick(s,1/60);assert.equal(s.planet,MOON_INDEX);assert.equal(s.mode,'walk');assert.ok(dot(s.n,n)>.99);assert.deepEqual(s.visited,[2]);}
+});
+test('Eight visible sun hits shrink and extinguish the sun while keeping the rider safe',()=>{
+ for(const fps of [30,60,120]){const s=createState();flyToMoon(s,fps);let oldHits=0,oldRadius=sunRadius(s);const impacts=[],kinds=new Set();let movingMeteor=false;
+ for(let i=0;i<fps*21;i++){tick(s,1/fps);for(const m of s.meteors){assert.equal(m.aim,'sun');kinds.add(m.kind);if(m.age>.7&&m.age<1.6){movingMeteor=true;assert.ok(length(sub(meteorPosition(m),m.from))>1);assert.ok(length(meteorPosition(m))>sunRadius(s));}}
+ if(s.sunHits!==oldHits){assert.equal(s.sunHits,oldHits+1);impacts.push(s.effect);oldHits=s.sunHits;}assert.ok(sunRadius(s)<=oldRadius+1e-9);oldRadius=sunRadius(s);assert.equal(s.mode,'walk');}
+ assert.equal(s.sunHits,SUN_HITS);assert.ok(sunIsOut(s));assert.equal(s.sunGlow,0);assert.ok(sunRadius(s)<SUN.r*.11);assert.equal(s.meteors.length,0);assert.equal(s.hits,0);assert.ok(movingMeteor);assert.deepEqual([...kinds].sort(),['asteroid','meteorite']);assert.deepEqual(impacts,[...Array(7).fill('sun-hit'),'sun-out']);assert.equal(knockIntoSun(s),false);
+ }
+});
+test('The solar show survives takeoff and Home, stops after eight shots, and can be replayed without losing discoveries',()=>{
+ for(const exit of ['fly','home','sun']){const s=createState();s.stars=['2:0'];flyToMoon(s);step(s,1);assert.equal(s.meteors.length,1);if(exit==='fly')startFlight(s);else if(exit==='home')home(s);else knockIntoSun(s);step(s,22);assert.ok(sunIsOut(s));assert.equal(s.sunShots,SUN_HITS);assert.equal(s.hits,exit==='sun'?1:0);home(s);assert.ok(sunIsOut(s));assert.equal(s.sunGlow,0);restoreSun(s);assert.equal(s.mode,'walk');assert.equal(s.planet,2);assert.equal(s.sunGlow,1);assert.equal(s.sunHits,0);assert.equal(s.moonFriendly,false);assert.deepEqual(s.stars,['2:0']);assert.equal(s.meteors.length,0);flyToMoon(s);step(s,21);assert.ok(sunIsOut(s));}
+});
+test('An extinguished sun does not start a hot ride or allow flight through its cold core',()=>{
+ const s=createState();s.sunHits=s.sunShots=SUN_HITS;s.sunGlow=0;s.moonFriendly=true;startFlight(s);s.ride.time=2;s.ride.position=[-5,0,0];s.ride.velocity=[1200,0,0];tick(s,.05,{flight:[1,0,0]});assert.equal(s.mode,'flight');assert.ok(length(position(s))>sunRadius(s));assert.equal(s.hits,0);assert.equal(s.event,'Just a cool little ember now.');
 });
