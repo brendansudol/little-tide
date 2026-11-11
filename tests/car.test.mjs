@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {createState,tick,toggleCar,nearCar,jump,home,orderSandwich,eat,social,washPhase,COURSE,CONES,CAFE,WASH,TRACK_LENGTH,trafficPose,distance,cameraDirection} from '../dist/car/rules.js';
+import {createState,tick,toggleCar,nearCar,jump,home,orderSandwich,eat,social,washPhase,COURSE,CONES,CAFE,WASH,TRACK_LENGTH,trafficPose,distance,cameraDirection,planRoute,setDestination,cancelDestination,SOLIDS} from '../dist/car/rules.js';
 const step=(s,seconds,input={},fps=60)=>{for(let i=0;i<Math.ceil(seconds*fps);i++)tick(s,input,1/fps);};
 const driver=()=>{const s=createState();assert.ok(toggleCar(s));return s;};
 test('Enter and safely exit the parked car; walk, jump, and keep progress on recovery',()=>{
@@ -45,4 +45,24 @@ test('Friendly traffic loops continuously, waits for pedestrians, and replies to
  const start=trafficPose(0),end=trafficPose(TRACK_LENGTH-.001);assert.ok(distance(start,end)<.002);for(let d=0;d<TRACK_LENGTH;d+=.1)assert.ok(distance(trafficPose(d),trafficPose(d+.01))<.011);
  const s=createState(),n=s.npcs[0],p=trafficPose(n.d+4);s.x=p.x;s.z=p.z;const d=n.d;step(s,1);assert.equal(n.d,d);assert.ok(social(s));assert.ok(s.friends.includes(n.name));assert.ok(n.reply>0);assert.equal(social(s),false);step(s,2);social(s);assert.equal(s.friends.length,1);s.x=0;s.z=0;step(s,2);assert.ok(n.d>d);s.mode='drive';s.car.x=n.x;s.car.z=n.z;step(s,2);assert.ok(social(s));assert.equal(s.effect,'honk');assert.equal(s.friends.length,1);
  const free=createState();const initial=free.npcs.map(n=>n.d);step(free,10);assert.ok(free.npcs.every((n,i)=>n.d!==initial[i]));
+});
+
+const arrive=(s,fps=60)=>{for(let i=0;i<fps*35&&s.destination;i++){tick(s,{},1/fps);assert.ok(!SOLIDS.some(b=>Math.abs(s.car.x-b.x)<b.w/2+1.649&&Math.abs(s.car.z-b.z)<b.d/2+1.649),'Route entered a wall');}assert.equal(s.destination,null,'Trip did not finish');};
+test('Tap destinations drive and park precisely, including a nearby spot and retargeting',()=>{
+ for(const fps of [30,60,120]){const s=driver();s.npcs=[];assert.ok(setDestination(s,-12,12));arrive(s,fps);assert.ok(distance(s.car,{x:-12,z:12})<.23);assert.equal(s.car.speed,0);const parked={...s.car};step(s,1,{},fps);assert.equal(distance(s.car,parked),0);
+ assert.ok(setDestination(s,parked.x+.1,parked.z));arrive(s,fps);assert.equal(s.car.speed,0);assert.ok(setDestination(s,-30,-20));step(s,.5,{},fps);assert.ok(setDestination(s,0,15));arrive(s,fps);assert.ok(distance(s.car,{x:0,z:15})<.23);}
+});
+test('Destination routes go around the café and car wash walls, and can leave a wall edge',()=>{
+ for(const fps of [30,60,120])for(const [start,goal] of [[{x:13,z:-5},{x:13,z:-27}],[{x:18,z:0},{x:35,z:0}],[{x:13,z:-10.1},{x:13,z:0}]]){const s=driver();s.npcs=[];Object.assign(s.car,start);const route=planRoute(s.car,goal);assert.ok(route);if(start.z!==-10.1)assert.ok(route.length>1);assert.ok(setDestination(s,goal.x,goal.z));arrive(s,fps);assert.ok(distance(s.car,goal)<.23);}
+});
+test('Manual directions, brake, hopping out and home cancel automatic driving',()=>{
+ for(const input of [{x:1},{z:-1},{brake:true}]){const s=driver();s.npcs=[];setDestination(s,-20,0);step(s,.5);tick(s,input,1/60);assert.equal(s.destination,null);}
+ const s=driver();setDestination(s,-20,0);assert.ok(toggleCar(s));assert.equal(s.destination,null);assert.equal(setDestination(s,0,0),false);toggleCar(s);setDestination(s,-20,0);cancelDestination(s);assert.equal(s.destination,null);setDestination(s,-20,0);home(s);assert.equal(s.destination,null);
+});
+test('Invalid destinations stop the old route and cannot send the car inside buildings or outside the world',()=>{
+ const s=driver();for(const p of [{x:13,z:-15},{x:23,z:0},{x:100,z:0},{x:0,z:100},{x:NaN,z:1},{x:Infinity,z:0}]){assert.ok(setDestination(s,-20,0));assert.equal(setDestination(s,p.x,p.z),false);assert.equal(s.destination,null);}
+});
+test('A tap route can start the wash, and a blocked route stops instead of driving forever',()=>{
+ const s=driver();s.npcs=[];Object.assign(s.car,{x:27,z:15,dirt:1});assert.ok(setDestination(s,27,0));for(let i=0;i<300&&s.mode==='drive';i++)tick(s,{},1/60);assert.equal(s.mode,'wash');assert.equal(s.destination,null);step(s,10);assert.equal(s.washes,1);assert.ok(s.badges.clean);
+ const blocked=driver(),n=blocked.npcs[0];n.d=30;n.speed=0;Object.assign(n,trafficPose(n.d));blocked.npcs=[n];Object.assign(blocked.car,{x:n.x,z:n.z+7});assert.ok(setDestination(blocked,n.x,n.z-7));step(blocked,8);assert.equal(blocked.destination,null);assert.equal(blocked.car.speed,0);assert.ok(distance(blocked.car,n)>=3.5);
 });

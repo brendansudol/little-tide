@@ -26,7 +26,7 @@ Eleven playful 3D worlds to explore in your browser, built with Three.js.
 
 Use **WASD / arrow keys** to move, **drag** to look, **scroll / pinch** to zoom, and **Space** to jump. Press **E** for nearby interactions. On a phone, use the joystick, jump button, and contextual action button. Open **Menu** for controls, world navigation, and optional map/progress panels.
 
-In Car World, point the **joystick, WASD, or arrow keys** where you want to go on the screen. The car turns automatically, slows for tight turns, and stops when you let go. Push the joystick gently to creep along. **Space** is an extra brake, **E** enters/exits the car, and **H** honks or waves.
+In Car World, **tap or click the ground** to drive to a destination along a dotted route. The car goes around the café and wash walls and parks on arrival. **Stop here**, the brake, or manual controls cancel the route; dragging/pinching still controls the view. To drive yourself, point the **joystick, WASD, or arrow keys** where you want to go on the screen. The car turns automatically, slows for tight turns, and stops when you let go. Push the joystick gently to creep along. **Space** is an extra brake, **E** enters/exits the car, and **H** honks or waves.
 
 ## Run locally
 
