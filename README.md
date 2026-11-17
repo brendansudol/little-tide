@@ -1,6 +1,6 @@
 # Little Tide
 
-Eleven playful 3D worlds to explore in your browser, built with Three.js.
+Twelve playful 3D worlds to explore in your browser, built with Three.js.
 
 - **[Beach World](https://brendansudol.github.io/little-tide/)** — walk along the shore, swim with shrimp, and pet friendly stingrays.
 - **[Candy World](https://brendansudol.github.io/little-tide/candy/)** — explore lollipop forests and bounce on marshmallows.
@@ -21,6 +21,8 @@ Eleven playful 3D worlds to explore in your browser, built with Three.js.
 - **[Space World](https://brendansudol.github.io/little-tide/space/)** — steer your jetpack freely between eight walkable toy planets and touch down anywhere, collect stardust, dodge New Moon’s meteors, and take a silly, scorching detour to the sun. A cooling comet brings you safely back. Fly to and land on New Moon to aim his asteroids at the sun: eight hits shrink it into darkness. Explore by helmet light, then bring back the sunshine to play again.
 
 - **[Car World](https://brendansudol.github.io/little-tide/car/)** — hop in a peach convertible, weave through a timed cone course, splash through mud and a bubbly car wash, wave to friendly drivers, and stop for a vegan breakfast sandwich. Hop out anytime to explore on foot.
+
+- **[Blanket World](https://brendansudol.github.io/little-tide/blanket/)** — explore a stitched quilt kingdom, rescue six buttons to light up a blanket fort, win Pillow Toss, ride a flying quilt, and tickle Snooze during a bedtime blizzard. His snuggle attack turns you into a flying blanket burrito.
 
 ## Play
 
