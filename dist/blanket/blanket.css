@@ -7,3 +7,5 @@
 @media(min-width:701px) and (min-height:521px){body.playing #game-banner{left:32px;transform:none;top:170px;min-width:250px;max-width:270px}body.playing #toast{top:158px}}
 
 #kid-friends{border-top:1px dashed #c5acc5;margin-top:9px;padding-top:12px}body.snuggling #game-banner{min-width:235px}body.snuggling .cozy-track{display:none}@media(min-width:701px) and (min-height:521px){body.snuggling #game-banner{left:32px;transform:none;top:170px;max-width:270px}body.snuggling #toast{top:158px}}
+/* Keep the little family in view on phones while the explorer is tucked in. */
+body.compact-hud.snuggling #game-banner{display:grid;grid-template-columns:1fr auto;gap:3px 10px;width:calc(100% - 40px);max-width:360px;min-width:0;padding:10px 14px;text-align:left}body.compact-hud.snuggling #game-eyebrow{display:none}body.compact-hud.snuggling #game-title{font-size:18px;margin:0;align-self:center}body.compact-hud.snuggling #game-detail{grid-column:1 / -1;font-size:10px}body.compact-hud.snuggling #stop-game{grid-column:2;grid-row:1;margin:0;min-height:30px;font-size:10px}body.compact-hud.snuggling #toast{display:none}
