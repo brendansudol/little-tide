@@ -5,3 +5,5 @@
 
 .interact.aim-ready{background:#8bbca5;color:#234c43;border-color:#c2e6d4;box-shadow:0 5px 28px #749e8b30}
 @media(min-width:701px) and (min-height:521px){body.playing #game-banner{left:32px;transform:none;top:170px;min-width:250px;max-width:270px}body.playing #toast{top:158px}}
+
+#kid-friends{border-top:1px dashed #c5acc5;margin-top:9px;padding-top:12px}body.snuggling #game-banner{min-width:235px}body.snuggling .cozy-track{display:none}@media(min-width:701px) and (min-height:521px){body.snuggling #game-banner{left:32px;transform:none;top:170px;max-width:270px}body.snuggling #toast{top:158px}}

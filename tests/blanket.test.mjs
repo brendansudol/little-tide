@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {FORT,TOSS,CARPET,BOUNCES,BUTTONS,WALLS,groundHeight,inFort,weather,basketX,throwReady,createState,nearby,jump,home,act,tick,ridePose,pillowPosition,dist} from '../dist/blanket/rules.js';
+import {FORT,TOSS,CARPET,COZY,KIDS,BOUNCES,BUTTONS,WALLS,groundHeight,inFort,weather,basketX,throwReady,createState,nearby,jump,home,act,leaveCozy,kidTarget,tick,ridePose,pillowPosition,dist} from '../dist/blanket/rules.js';
 const step=(s,seconds,input={x:0,z:0},fps=60)=>{for(let i=0;i<Math.ceil(seconds*fps);i++)tick(s,1/fps,input);};
 const place=(s,p)=>Object.assign(s,{x:p.x,z:p.z,y:groundHeight(p.x,p.z),vy:0});
 const near=(a,b)=>{for(const k of ['x','y','z'])assert.ok(Math.abs(a[k]-b[k])<.001,`${k}: ${a[k]} / ${b[k]}`);};
@@ -32,4 +32,44 @@ test('Fort shelter, jumping, Pillow Toss and tickling all protect against Snooze
 });
 test('Home cancels either ride without awarding unfinished adventures or removing earned badges',()=>{
  for(const kind of ['flight','burrito']){const s=createState();s.badges.brave=true;s.buttons=[1];s.ride={kind,time:0,start:{x:s.x,y:s.y,z:s.z}};step(s,1);home(s);assert.equal(s.ride,null);assert.equal(s.badges.flight,false);assert.ok(s.badges.brave);assert.deepEqual(s.buttons,[1]);assert.equal(s.x,0);assert.equal(s.z,18);assert.equal(s.y,groundHeight(0,18));}
+});
+
+test('Eight unique gentle little Snoozes can each become a friend without duplicating discoveries',()=>{
+ const s=createState();s.monster.nap=1000;
+ assert.equal(s.kids.length,8);assert.equal(new Set(s.kids.map(k=>k.name)).size,8);
+ for(let i=0;i<8;i++){
+  place(s,{x:0,z:18});s.kids.forEach((k,j)=>Object.assign(k,{x:j===i?1:20,z:j===i?18:-20}));s.kidCooldown=0;
+  assert.equal(nearby(s).index,i);assert.ok(act(s));assert.ok(s.kids[i].met);assert.equal(s.kids[i].follow,18);assert.equal(s.kids[i].happy,3);
+  assert.equal(act(s),false,'A held interaction cannot endlessly tickle');
+ }
+ assert.equal(s.kids.filter(k=>k.met).length,8);
+ home(s);assert.equal(s.kids.filter(k=>k.met).length,8);
+ s.time=32;s.kids.forEach(k=>{k.x=s.x;k.z=s.z;});step(s,.1);assert.equal(s.catches,0);assert.equal(s.ride,null);
+ Object.assign(s.monster,{x:s.x,z:s.z,nap:0});s.kidCooldown=0;assert.equal(nearby(s).kind,'tickle','Snooze defense takes priority over a nearby child');
+});
+test('Little friends follow, settle after their playtime, and respect fort walls and world boundaries',()=>{
+ for(const fps of [30,60,120]){
+  const s=createState();s.monster.nap=1000;const k=s.kids[0];place(s,{x:0,z:0});Object.assign(k,{x:1,z:0});act(s);
+  place(s,{x:10,z:0});step(s,3,undefined,fps);assert.ok(dist(k,kidTarget(s,0))<.1);
+  step(s,16,undefined,fps);assert.equal(k.follow,0);
+  Object.assign(k,{x:-6,z:-9,follow:18});place(s,{x:-20,z:-9});step(s,1,undefined,fps);assert.ok(k.x>-6.36);
+  place(s,{x:27,z:25});s.kids.forEach(k=>k.follow=18);step(s,3,undefined,fps);assert.ok(s.kids.every(k=>k.x<=27&&k.z<=25));
+ }
+});
+test('Snuggling brings all eight children to a safe circle, protects against storms, and supports repeat peekaboo',()=>{
+ for(const fps of [30,60,120]){
+  const s=createState();s.time=32;place(s,{x:COZY.x-2,z:COZY.z});Object.assign(s.monster,{x:s.x,z:s.z,nap:0});
+  assert.equal(nearby(s).kind,'cozy');assert.ok(act(s));assert.ok(s.cozy);step(s,1,undefined,fps);assert.equal(s.x,COZY.x);assert.equal(s.z,COZY.z);assert.equal(s.ride,null);assert.equal(s.catches,0);
+  step(s,22,undefined,fps);for(let i=0;i<8;i++)assert.ok(dist(s.kids[i],kidTarget(s,i))<.2,`${s.kids[i].name} reaches story time`);
+  assert.ok(act(s));assert.ok(s.cozy.peek>0);assert.ok(s.kids.every(k=>k.happy>0));assert.equal(act(s),false);step(s,2.3,undefined,fps);assert.equal(s.cozy.peek,0);assert.ok(act(s));
+ }
+});
+test('Walking, jumping, the Hop out button, and Home all leave the snuggle blanket safely',()=>{
+ for(const exit of ['walk','jump','button','home']){
+  const s=createState();place(s,COZY);act(s);step(s,1);s.buttons=[0,1];s.kids[0].met=true;
+  if(exit==='walk')step(s,.2,{x:1,z:0});if(exit==='jump')assert.ok(jump(s));if(exit==='button')assert.ok(leaveCozy(s));if(exit==='home')home(s);
+  assert.equal(s.cozy,null);assert.deepEqual(s.buttons,[0,1]);assert.ok(s.kids[0].met);assert.equal(s.ride,null);assert.ok(s.monster.nap>0);
+  if(exit==='walk')assert.ok(s.x>COZY.x);if(exit==='jump')assert.ok(s.vy>0);
+ }
+ const s=createState();assert.equal(leaveCozy(s),false);place(s,CARPET);act(s);assert.equal(nearby(s),null);assert.equal(act(s),false);
 });

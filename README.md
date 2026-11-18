@@ -22,7 +22,7 @@ Twelve playful 3D worlds to explore in your browser, built with Three.js.
 
 - **[Car World](https://brendansudol.github.io/little-tide/car/)** — hop in a peach convertible, weave through a timed cone course, splash through mud and a bubbly car wash, wave to friendly drivers, and stop for a vegan breakfast sandwich. Hop out anytime to explore on foot.
 
-- **[Blanket World](https://brendansudol.github.io/little-tide/blanket/)** — explore a stitched quilt kingdom, rescue six buttons to light up a blanket fort, win Pillow Toss, ride a flying quilt, and tickle Snooze during a bedtime blizzard. His snuggle attack turns you into a flying blanket burrito.
+- **[Blanket World](https://brendansudol.github.io/little-tide/blanket/)** — explore a stitched quilt kingdom, rescue six buttons to light up a blanket fort, win Pillow Toss, ride a flying quilt, and tickle Snooze during a bedtime blizzard. His snuggle attack turns you into a flying blanket burrito. Meet eight little Snooze kids, make giggly friends, and tuck into a blanket for peekaboo.
 
 ## Play
 
