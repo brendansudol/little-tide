@@ -1,6 +1,6 @@
 # Little Tide
 
-Twelve playful 3D worlds to explore in your browser, built with Three.js.
+Thirteen playful 3D worlds to explore in your browser, built with Three.js.
 
 - **[Beach World](https://brendansudol.github.io/little-tide/)** — walk along the shore, swim with shrimp, and pet friendly stingrays.
 - **[Candy World](https://brendansudol.github.io/little-tide/candy/)** — explore lollipop forests and bounce on marshmallows.
@@ -23,6 +23,8 @@ Twelve playful 3D worlds to explore in your browser, built with Three.js.
 - **[Car World](https://brendansudol.github.io/little-tide/car/)** — hop in a peach convertible, weave through a timed cone course, splash through mud and a bubbly car wash, wave to friendly drivers, and stop for a vegan breakfast sandwich. Hop out anytime to explore on foot.
 
 - **[Blanket World](https://brendansudol.github.io/little-tide/blanket/)** — explore a stitched quilt kingdom, rescue six buttons to light up a blanket fort, win Pillow Toss, ride a flying quilt, and tickle Snooze during a bedtime blizzard. His snuggle attack turns you into a flying blanket burrito. Meet eight little Snooze kids, make giggly friends, and tuck into a blanket for peekaboo.
+
+- **[Spice World](https://brendansudol.github.io/little-tide/spice/)** — explore a ketchup floor, barbecue maze, and mustard ceiling. Dodge Squeeze’s ketchup squirts, race him to the golden exit, and fly a french fry around the world twice if he wins. Meet six spice friends, bounce on a giant pickle, and try the seasoning shower.
 
 ## Play
 
