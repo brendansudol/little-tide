@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {TAU,START,FINISH,SPAWN,SHOWER,BOUNCE,MIXER,SAUCES,RACE_SPEED,RACE_HEAD_START,RACE_FINISH_TIME,SPICES,WALLS,LINKS,ROUTE,ROUTE_CELLS,ROUTE_LENGTH,cellPoint,cellRoute,createState,nearby,act,addSauce,clearRecipe,stirSauces,closeMixer,sauceResult,jump,home,tick,move,dist,clearSight,routePose,recoveryPose,shotPosition} from '../dist/spice/rules.js';
+import {TAU,START,FINISH,SPAWN,SHOWER,BOUNCE,MIXER,SAUCES,RACE_SPEED,RACE_HEAD_START,RACE_FINISH_TIME,FINISH_LINE_Z,SPICES,WALLS,LINKS,ROUTE,ROUTE_CELLS,ROUTE_LENGTH,cellPoint,cellRoute,createState,nearby,act,addSauce,clearRecipe,stirSauces,closeMixer,sauceResult,takeSauce,sauceAim,squirtSauce,sauceShotPosition,jump,home,tick,move,dist,clearSight,routePose,recoveryPose,shotPosition} from '../dist/spice/rules.js';
 const step=(s,seconds,input={x:0,z:0},fps=60)=>{for(let i=0;i<Math.ceil(seconds*fps);i++)tick(s,1/fps,input);};
 const place=(s,p)=>Object.assign(s,{x:p.x,z:p.z,y:0,vy:0});
 const close=(a,b)=>assert.ok(dist(a,b)<.001,`${JSON.stringify(a)} / ${JSON.stringify(b)}`);
@@ -69,4 +69,39 @@ test('Lab play prevents ketchup attacks and leaving cancels unfinished mixes wit
   if(exit==='walk')step(s,.2,{x:1,z:0});if(exit==='jump')assert.ok(jump(s));if(exit==='close')assert.ok(closeMixer(s));if(exit==='home')assert.ok(home(s));assert.equal(s.mode,'explore');assert.equal(s.mixer.phase,'idle');assert.equal(s.mixer.batches,0);assert.equal(s.mixer.result,null);assert.deepEqual(s.mixer.recipe,['pesto','berry']);assert.ok(s.shield>0);
  }
  const s=openLab();addSauce(s,'berry');addSauce(s,'mustard');stirSauces(s);step(s,4);const color=s.apronColor;closeMixer(s);assert.equal(s.mixer.phase,'idle');assert.equal(s.mixer.batches,1);assert.equal(s.apronColor,color);place(s,SHOWER);act(s);assert.equal(s.apronColor,'#fff1cd');
+});
+
+
+function walkPath(s,path,fps=60){
+ for(const p of path){let frames=0;while(dist(s,p)>.025&&s.mode==='race'&&frames++<fps*8){const d=dist(s,p),a=Math.min(1,d/(7.2/fps));tick(s,1/fps,{x:(p.x-s.x)/d*a,z:(p.z-s.z)/d*a});}if(s.mode==='race')assert.ok(dist(s,p)<.025,'Path must traverse real walls');}
+}
+test('Wall-hugging through the maze wins at the visible stripe and can never be flicked afterward',()=>{
+ // This legal route missed every old 2.2-radius center checkpoint and reproduced the reported loss.
+ const path=[[-17.22,11],[-17.22,6.22],[-.78,6.22],[-.78,-4.22],[-11.22,-4.22],[-11.22,-16.22],[-.78,-16.22],[-.78,-22.22],[17.22,-22.22],[17.22,-27.3]].map(([x,z])=>({x,z}));
+ for(const fps of [30,60,120]){const s=startRace();walkPath(s,path,fps);assert.equal(s.wins,1);assert.equal(s.losses,0);assert.equal(s.mode,'explore');assert.ok(s.badges.race);step(s,20,undefined,fps);assert.equal(s.losses,0);assert.equal(s.mode,'explore');}
+});
+test('Both edges of the finish stripe count, including jumps, without an outside-maze shortcut',()=>{
+ for(const fps of [30,60,120])for(const side of [-1,1]){const s=startRace();walkPath(s,ROUTE.slice(1,-1),fps);walkPath(s,[{x:15,z:-24.5},{x:15+side*2.8,z:-24.5}],fps);jump(s);walkPath(s,[{x:s.x,z:-27}],fps);assert.equal(s.wins,1);assert.equal(s.losses,0);}
+ const s=startRace();walkPath(s,[{x:-22,z:11},{x:-22,z:-27.5},{x:15,z:-27.5}],60);assert.equal(s.wins,0);
+});
+test('Close finishes compare actual crossing times within the frame; ties favor the player',()=>{
+ for(const fps of [30,60,120])for(const margin of [-.003,0,.003]){const s=startRace();walkPath(s,ROUTE.slice(1,-1),fps);place(s,{x:15,z:FINISH_LINE_Z+.05});const crossing=.05/7.2;s.race.elapsed=RACE_FINISH_TIME-crossing+margin;tick(s,1/fps,{x:0,z:-1});assert.equal(s.wins,margin<=0?1:0);assert.equal(s.losses,margin<=0?0:1);}
+});
+function bottledSauce(first='berry',second='garlic'){const s=openLab();addSauce(s,first);addSauce(s,second);stirSauces(s);step(s,3.6);assert.ok(takeSauce(s));return s;}
+test('Only finished sauce can be bottled, and the carried recipe survives clearing, travel, and unfinished mixes',()=>{
+ const s=openLab();assert.equal(takeSauce(s),false);addSauce(s,'berry');addSauce(s,'garlic');stirSauces(s);assert.equal(takeSauce(s),false);step(s,3.6);assert.ok(takeSauce(s));assert.equal(s.mode,'explore');const bottle={...s.carriedSauce};assert.equal(bottle.name,'Purple Cloud');
+ place(s,MIXER);act(s);clearRecipe(s);assert.deepEqual(s.carriedSauce,bottle);addSauce(s,'ketchup');addSauce(s,'mustard');stirSauces(s);step(s,1);home(s);assert.deepEqual(s.carriedSauce,bottle);place(s,SHOWER);act(s);assert.deepEqual(s.carriedSauce,bottle);
+ place(s,MIXER);act(s);stirSauces(s);step(s,4);takeSauce(s);assert.equal(s.carriedSauce.name,'Sunset Sizzle');
+});
+test('Aiming is forgiving, visible sauce travels before painting, and Squeeze keeps the mixed color',()=>{
+ for(const fps of [30,60,120]){const s=bottledSauce();place(s,{x:7,z:17});Object.assign(s.monster,{x:5,z:15,cooldown:0});s.shield=0;tick(s,1/fps);assert.ok(s.monster.shot);assert.equal(sauceAim(s),'ready');const color=s.carriedSauce.color;assert.ok(squirtSauce(s));assert.equal(squirtSauce(s),false);assert.equal(s.monster.color,'#d83c23');close(sauceShotPosition(s.sauceShot),s.sauceShot.from);step(s,.25,undefined,fps);assert.equal(s.sauceHits,0);step(s,.25,undefined,fps);assert.equal(s.sauceHits,1);assert.equal(s.monster.color,color);assert.equal(s.monster.shot,null);assert.ok(s.monster.painted>0);step(s,1,undefined,fps);assert.equal(s.sauceHits,1);assert.ok(squirtSauce(s));step(s,.5,undefined,fps);assert.equal(s.sauceHits,2);home(s);assert.equal(s.monster.color,color);assert.equal(s.carriedSauce.color,color);}
+});
+test('Sauce cannot shoot through walls, out of reach, without a bottle, or during lab and recovery',()=>{
+ const s=bottledSauce();place(s,{x:-16,z:-20});Object.assign(s.monster,{x:-20,z:-20});assert.equal(sauceAim(s),'blocked');assert.equal(squirtSauce(s),false);place(s,{x:25,z:25});assert.equal(sauceAim(s),'far');assert.equal(squirtSauce(s),false);
+ for(const mode of ['mixing','countdown','flick','orbit','return']){s.mode=mode;assert.equal(sauceAim(s),'unavailable');assert.equal(squirtSauce(s),false);}assert.equal(squirtSauce(createState()),false);
+ // A clear shot cannot pass through a wall if Squeeze moves behind it during flight.
+ s.mode='explore';place(s,{x:-22,z:15});Object.assign(s.monster,{x:-22,z:12});assert.ok(squirtSauce(s));Object.assign(s.monster,{x:-15,z:0});step(s,.5);assert.equal(s.sauceHits,0);assert.equal(s.monster.color,'#d83c23');
+});
+test('Painting during a race never changes its pace, checkpoints, or winner',()=>{
+ const s=bottledSauce();place(s,START);act(s);step(s,3.1);assert.ok(squirtSauce(s));step(s,.5);assert.equal(s.sauceHits,1);assert.equal(s.mode,'race');assert.equal(s.race.monsterDistance,Math.max(0,s.race.elapsed-RACE_HEAD_START)*RACE_SPEED);followRoute(s);assert.equal(s.wins,1);assert.equal(s.losses,0);
 });

@@ -1,5 +1,5 @@
 import * as THREE from '../vendor/three.module.js';
-import {TAU,MAZE,START,FINISH,SPAWN,SHOWER,BOUNCE,MIXER,SAUCES,RACE_HEAD_START,RACE_FINISH_TIME,SPICES,WALLS,ROUTE,ROUTE_LENGTH,createState,nearby,act,addSauce,clearRecipe,stirSauces,closeMixer,sauceResult,jump,home,tick,shotPosition,dist,clamp} from './rules.js?v=sauce-2';
+import {TAU,MAZE,START,FINISH,SPAWN,SHOWER,BOUNCE,MIXER,SAUCES,RACE_HEAD_START,RACE_FINISH_TIME,FINISH_HALF_WIDTH,SPICES,WALLS,ROUTE,ROUTE_LENGTH,createState,nearby,act,addSauce,clearRecipe,stirSauces,closeMixer,sauceResult,takeSauce,sauceAim,squirtSauce,sauceShotPosition,jump,home,tick,shotPosition,dist,clamp} from './rules.js?v=sauce-3';
 const $=s=>document.querySelector(s),canvas=$('#world'),reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
 let renderer;
 try{renderer=new THREE.WebGLRenderer({canvas,antialias:true});}catch(error){$('#loading').innerHTML='<p>Spice World needs WebGL.<br>Please enable hardware acceleration and try again.</p>';throw error;}
@@ -55,6 +55,7 @@ shaker(-24,-18,'#6d6455','PEPPER');shaker(24,-17,'#ece5d5','SALT');shaker(25,-5,
 for(let i=0;i<11;i++){const g=group(Math.cos(i*2)*85,2+rand()*14,Math.sin(i*2)*85);for(let j=-1;j<=1;j++)ball(g,cream,j*3,0,0,4,1.6,2.7);}
 function arch(p,text,color){const g=group(p.x,0,p.z);box(g,cream,-3,2.4,0,.32,4.8,.32);box(g,cream,3,2.4,0,.32,4.8,.32);box(g,color,0,4.65,0,6.6,.8,.55);for(let i=0;i<10;i++)box(g,i%2?dark:cream,-2.8+i*.62,4.65,.29,.6,.65,.04);const s=label(text,6);s.position.y=5.7;g.add(s);return g;}
 arch(START,'RACE SQUEEZE',red);arch(FINISH,'THE GOLDEN FINISH',mustard);
+for(let i=0;i<12;i++)box(scene,i%2?dark:cream,FINISH.x-FINISH_HALF_WIDTH+(i+.5)*.5,.035,FINISH.z,.5,.05,.7);
 const startRing=group(START.x,0,START.z);ring(startRing,2.5,.06,'#ffe6a2');
 const finishRing=group(FINISH.x,0,FINISH.z);ring(finishRing,2.5,.06,'#ffe6a2');
 const trophy=group(23,0,-27);cylinder(trophy,bbq,0,.5,0,1.6,1);cylinder(trophy,gold,0,1.3,0,.35,.6);mesh(new THREE.CylinderGeometry(1,.45,1.5,20,1,true),gold,trophy,0,2.3,0);for(const side of [-1,1]){const handle=mesh(new THREE.TorusGeometry(.6,.12,8,24),gold,trophy,side*.9,2.4,0);handle.scale.x=.7;}sign('SQUEEZE CUP',23,4.6,-27,5);
@@ -92,10 +93,11 @@ const sauceFountain=group(0,3.4,-.6,lab),fountainArcs=SAUCES.map((s,i)=>{
 const mixBubbles=Array.from({length:14},(_,i)=>{const o=ball(lab,mat(SAUCES[i%6].color,{roughness:.25}),0,0,0,.12+(i%3)*.055);o.visible=false;return o;});
 let labParticleTime=0;
 // Squeeze: a squishy ketchup bottle with a nozzle, mittens, sneakers and a cheeky face.
-const monster=group(),monsterBody=group(0,0,0,monster);ball(monsterBody,red,0,1.9,0,1.45,1.9,1.2);cylinder(monsterBody,cream,0,3.35,0,.75,.35);mesh(new THREE.ConeGeometry(.55,1.3,20),red,monsterBody,0,4.05,0);ball(monsterBody,dark,0,4.68,0,.15,.025,.15);
+const monsterPaint=red.clone();
+const monster=group(),monsterBody=group(0,0,0,monster);ball(monsterBody,monsterPaint,0,1.9,0,1.45,1.9,1.2);cylinder(monsterBody,cream,0,3.35,0,.75,.35);mesh(new THREE.ConeGeometry(.55,1.3,20),monsterPaint,monsterBody,0,4.05,0);ball(monsterBody,dark,0,4.68,0,.15,.025,.15);
 for(const x of [-.5,.5]){ball(monsterBody,cream,x,2.6,1,.4,.48,.16);ball(monsterBody,dark,x,2.58,1.16,.17,.23,.08);ball(monsterBody,cream,x-.05,2.68,1.23,.05);ball(monsterBody,pink,x*1.5,2.05,1.04,.25,.12,.07);}
 ball(monsterBody,dark,0,1.95,1.2,.25,.13,.06);const labelPatch=ball(monsterBody,cream,0,1.25,1.08,.66,.4,.08);const ketchupMark=label('K',1,'#fff1cd','#b83e29');ketchupMark.position.set(0,1.28,1.2);monsterBody.add(ketchupMark);
-const monsterArms=[];for(const side of [-1,1]){const arm=group(side*1.3,2.3,0,monsterBody);ball(arm,red,side*.5,-.2,0,.65,.22,.23);ball(arm,red,side*1,-.15,0,.3);monsterArms.push(arm);ball(monsterBody,cream,side*.75,.1,.25,.5,.25,.7);}
+const monsterArms=[];for(const side of [-1,1]){const arm=group(side*1.3,2.3,0,monsterBody);ball(arm,monsterPaint,side*.5,-.2,0,.65,.22,.23);ball(arm,monsterPaint,side*1,-.15,0,.3);monsterArms.push(arm);ball(monsterBody,cream,side*.75,.1,.25,.5,.25,.7);}
 const monsterTag=label('SQUEEZE',4.3);monsterTag.position.y=5.4;monster.add(monsterTag);
 const targetRing=group();const targetCircle=ring(targetRing,1.65,.08,'#fff2ce',.09);targetRing.visible=false;const ketchupShot=ball(scene,red,0,0,0,.4);
 ketchupShot.visible=false;const puddles=new Map();
@@ -103,6 +105,9 @@ ketchupShot.visible=false;const puddles=new Map();
 const player=group(),body=group(0,0,0,player),skin=mat('#e8b88f'),hair=mat('#6c4535');ball(body,green,0,1,0,.38,.58,.3);const apron=box(body,cream.clone(),0,1,.3,.65,.8,.08);ball(body,skin,0,1.84,0,.39,.42,.36);ball(body,hair,0,2.05,-.08,.4,.22,.3);for(const x of [-.13,.13])ball(body,dark,x,1.88,.34,.035);ball(body,pink,0,1.74,.36,.08,.035,.02);
 cylinder(body,cream,0,2.3,0,.4,.3);for(const x of [-.25,0,.25])ball(body,cream,x,2.52,0,.28,.28,.3);
 const limbs=[];for(const side of [-1,1]){const leg=group(side*.22,.55,0,body);box(leg,bbq,0,-.2,0,.23,.45,.25);ball(leg,cream,0,-.43,.13,.19,.12,.3);limbs.push(leg);const arm=group(side*.44,1.35,0,body);ball(arm,skin,0,-.25,0,.13,.32,.14);limbs.push(arm);}
+const carriedBottle=group(.58,1.15,.4,body),bottlePaint=mat('#fff1cd',{roughness:.3});
+ball(carriedBottle,bottlePaint,0,0,0,.2,.32,.2);cylinder(carriedBottle,cream,0,.29,0,.13,.12);mesh(new THREE.ConeGeometry(.1,.28,12),bottlePaint,carriedBottle,0,.48,0);carriedBottle.visible=false;
+const sauceDrops=Array.from({length:8},()=>{const o=ball(scene,mat('#fff1cd',{roughness:.25}),0,0,0,.15);o.visible=false;return o;});
 const apronSplat=ball(body,red,.1,1.06,.36,.17,.21,.02);apronSplat.visible=false;
 const crown=group(0,2.7,0,body);cylinder(crown,gold,0,0,0,.43,.15);for(let i=0;i<5;i++){const a=i/5*TAU;mesh(new THREE.ConeGeometry(.12,.3,6),gold,crown,Math.sin(a)*.35,.16,Math.cos(a)*.35);}crown.visible=false;
 // The recovery lap is outside the world; a french fry catches the explorer.
@@ -125,6 +130,7 @@ function effects(){
  if(state.event)toast(state.event);
  if(state.effect){
   if(['spice','badge','win','bounce','splat','go'].includes(state.effect))burst(state.x,state.y+2,state.z,state.effect==='win'?90:35);
+  if(state.effect==='sauce-hit')burst(state.monster.x,3,state.monster.z,70,[state.monster.color,'#fff1cd']);
   if(state.effect==='mix-party')burst(MIXER.x,6,MIXER.z-.6,100,state.mixer.recipe.map(id=>SAUCES.find(s=>s.id===id).color));
   if(state.effect==='shower')for(let i=0;i<5;i++)burst(SHOWER.x+(rand()-.5)*3,6,SHOWER.z+(rand()-.5)*3,18);
   tone(state.effect==='flick'?170:state.effect==='aim'?250:state.effect==='splat'?200:600);
@@ -136,6 +142,9 @@ $('#interact').onclick=interact;
 for(const button of document.querySelectorAll('[data-sauce]'))button.onclick=()=>{if(paused())return;addSauce(state,button.dataset.sauce);effects();refreshHud();};
 $('#brew-sauce').onclick=()=>{if(paused())return;stirSauces(state);effects();refreshHud();};
 $('#clear-sauce').onclick=()=>{if(paused())return;clearRecipe(state);effects();refreshHud();};
+$('#take-sauce').onclick=()=>{if(paused())return;takeSauce(state);clearControls();effects();refreshHud();canvas.focus({preventScroll:true});};
+function spray(){if(paused())return;squirtSauce(state);effects();refreshHud();canvas.focus({preventScroll:true});}
+$('#squirt-sauce').onclick=spray;
 $('#close-mixer').onclick=()=>{closeMixer(state);clearControls();effects();refreshHud();canvas.focus({preventScroll:true});};
 $('#jump').onclick=()=>{if(paused())return;if(state.mode==='orbit'){act(state);effects();refreshHud();}else if(jump(state))tone(300);};
 $('#home').onclick=()=>{if(home(state)){clearControls();yaw=0;pitch=.83;}effects();refreshHud();canvas.focus({preventScroll:true});};
@@ -144,7 +153,7 @@ $('#sound').onclick=()=>{sound=!sound;$('#sound').setAttribute('aria-pressed',St
 $('#help').onclick=()=>{clearControls();$('#help-dialog').showModal();};$('#close-help').onclick=$('#back').onclick=()=>$('#help-dialog').close();$('#help-dialog').addEventListener('close',()=>{clearControls();canvas.focus({preventScroll:true});});
 $('.world-menu').addEventListener('toggle',()=>{if($('.world-menu').open)clearControls();});addEventListener('blur',clearControls);document.addEventListener('visibilitychange',clearControls);
 const keyMap={arrowup:'w',arrowdown:'s',arrowleft:'a',arrowright:'d'};
-addEventListener('keydown',e=>{if(paused()||e.target.closest('button,summary,a,input')||e.ctrlKey||e.metaKey||e.altKey)return;const k=keyMap[e.key.toLowerCase()]||e.key.toLowerCase();if(!['w','a','s','d',' ','e'].includes(k))return;e.preventDefault();keys.add(k);if(!e.repeat&&k===' ')jump(state);if(!e.repeat&&k==='e')interact();});
+addEventListener('keydown',e=>{if(paused()||e.target.closest('button,summary,a,input')||e.ctrlKey||e.metaKey||e.altKey)return;const k=keyMap[e.key.toLowerCase()]||e.key.toLowerCase();if(!['w','a','s','d',' ','e','q'].includes(k))return;e.preventDefault();keys.add(k);if(!e.repeat&&k===' ')jump(state);if(!e.repeat&&k==='e')interact();if(!e.repeat&&k==='q')spray();});
 addEventListener('keyup',e=>keys.delete(keyMap[e.key.toLowerCase()]||e.key.toLowerCase()));
 canvas.addEventListener('pointerdown',e=>{if(e.button!==0)return;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});canvas.setPointerCapture(e.pointerId);});
 canvas.addEventListener('pointermove',e=>{const old=pointers.get(e.pointerId);if(!old)return;if(pointers.size===2){const other=[...pointers.entries()].find(([id])=>id!==e.pointerId)[1],before=Math.hypot(old.x-other.x,old.y-other.y),after=Math.hypot(e.clientX-other.x,e.clientY-other.y);distance=clamp(distance-(after-before)*.06,20,65);}else{yaw-=(e.clientX-old.x)*.006;pitch=clamp(pitch+(e.clientY-old.y)*.004,.4,1.25);}pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});});
@@ -174,6 +183,10 @@ function refreshHud(){
  if(state.mode==='flick'){title='Squeeze wins… FLICK!';detail='A flying french fry is coming to catch you.';progress=state.ride.time/2.3;eyebrow='A VERY SAUCY DETOUR';}
  if(state.mode==='orbit'){const laps=Math.min(2,Math.abs(state.orbit.angle)/TAU);title=`${Math.floor(laps)} / 2 laps · ${Math.floor((laps%1)*100)}%`;detail=state.orbit.cruise?'Flying! Two full laps and you land back home.':'Tap Fly, or hold W / ↑ / the joystick to circle the world.';progress=laps/2;eyebrow='THE FRENCH-FRY FLIGHT CLUB';}
  if(state.mode==='return'){title='Two laps! Home sweet sauce.';detail='Coming in for a soft landing. Your prizes are safe.';progress=1;eyebrow='A LITTLE COMEBACK';}
+ const aim=sauceAim(state),squirtButton=$('#squirt-sauce');squirtButton.hidden=aim==='unavailable';squirtButton.disabled=aim!=='ready';
+ squirtButton.style.setProperty('--bottle-color',state.carriedSauce?.color||'#fff1cd');
+ $('#squirt-title').textContent=aim==='ready'?'Squirt Squeeze!':aim==='far'?'Get closer to Squeeze':aim==='blocked'?'Find a clear shot':'Refilling…';
+ $('#bottle-name').textContent=state.carriedSauce?.name||'';
  const m=state.mixer,mixing=state.mode==='mixing';$('#mix-panel').hidden=!mixing;document.body.classList.toggle('mixing',mixing);
  if(mixing){
   $('#mix-title').textContent=m.phase==='stirring'?'Whirl, swirl, splash…':m.phase==='party'?'A fountain of flavor!':'A splash of imagination.';
@@ -182,6 +195,7 @@ function refreshHud(){
   $('#mix-slots').innerHTML=Array.from({length:4},(_,i)=>`<i style="background:${m.recipe[i]?SAUCES.find(s=>s.id===m.recipe[i]).color:'transparent'}"></i>`).join('');
   for(const b of document.querySelectorAll('[data-sauce]'))b.disabled=m.phase==='stirring'||m.recipe.length>=4;
   $('#brew-sauce').disabled=m.phase==='stirring'||new Set(m.recipe).size<2;$('#brew-sauce').textContent=m.phase==='stirring'?'Mixing…':'Mix & splash!';$('#clear-sauce').disabled=m.phase==='stirring';
+  $('#take-sauce').hidden=!m.result;$('#take-sauce').disabled=m.phase==='stirring';
   $('#mix-result').hidden=!m.result;$('#mix-result').textContent=m.result?`${m.result.name} · ${m.batches} ${m.batches===1?'batch':'batches'} made!`:'';
  }
  $('#race-title').textContent=title;$('#race-detail').textContent=detail;$('#race-eyebrow').textContent=eyebrow;$('#race-progress').style.width=`${clamp(progress,0,1)*100}%`;drawMap();
@@ -201,10 +215,13 @@ function animate(){
  sauceFountain.visible=mixing&&mix.phase==='party';
  if(sauceFountain.visible){const scale=reduced?.7:Math.min(1,mix.time*3,(5-mix.time)*2);sauceFountain.scale.setScalar(Math.max(.01,scale));fountainArcs.forEach((o,i)=>{o.material.color.set(recipeColors[i%recipeColors.length]);o.material.emissive.copy(o.material.color);});if(!isPaused&&!reduced&&(labParticleTime+=dt)>.14){labParticleTime=0;burst(MIXER.x,7,MIXER.z-.6,10,recipeColors);}}
  mixBubbles.forEach((o,i)=>{o.visible=mixing&&mix.recipe.length>0;const a=i/14*TAU+t*(mix.phase==='stirring'?3:.5);o.position.set(Math.sin(a)*2,3.5+Math.abs(Math.sin(t*3+i))*(mix.phase==='stirring'?1:.2),-.6+Math.cos(a)*2);o.material.color.set(recipeColors[i%recipeColors.length]||'#fff1cd');});
- apron.material.color.set(state.apronColor);
+ apron.material.color.set(state.apronColor);carriedBottle.visible=!!state.carriedSauce;
+ if(state.carriedSauce)bottlePaint.color.set(state.carriedSauce.color);
+ sauceDrops.forEach((o,i)=>{const shot=state.sauceShot;o.visible=!!shot&&shot.age>i*.025;if(o.visible){const p=sauceShotPosition(shot,i*.025);o.position.set(p.x,p.y,p.z);o.material.color.set(shot.color);o.scale.setScalar(.18-i*.012);}});
+ monsterPaint.color.set(state.monster.color);
  player.position.set(state.x,state.y,state.z);player.rotation.set(0,state.yaw,state.mode==='flick'&&!reduced?Math.sin(state.ride.time*5)*.6:0);player.scale.setScalar(recovery?2:1);fry.visible=recovery;flightTag.visible=recovery;apronSplat.visible=state.stain>0;crown.visible=state.badges.spices;
  const moving=!isPaused&&!recovery&&state.mode!=='countdown'&&!mixing&&Math.hypot(input.x,input.z)>.1;if(moving)walkPhase+=dt*11;limbs.forEach((l,i)=>l.rotation.x=moving?Math.sin(walkPhase+(i<2?0:Math.PI))*.5:0);if(recovery)limbs.forEach((l,i)=>{l.rotation.x=i%2?-.7:0;});
- const m=state.monster;monster.position.set(m.x,reduced?0:Math.sin(t*3)*.07,m.z);monster.rotation.y=m.yaw;monsterBody.scale.set(1,m.shot?1+Math.sin(m.shot.age*12)*.05:1,1);monsterArms.forEach((a,i)=>a.rotation.z=state.mode==='flick'?(i?-.9:1.5):reduced?0:Math.sin(t*(state.mode==='race'?6:2)+i)*.16);
+ const m=state.monster;monster.position.set(m.x,reduced?0:m.painted>0?Math.abs(Math.sin(m.painted*9))*.6:Math.sin(t*3)*.07,m.z);monster.rotation.y=m.yaw;monsterBody.scale.set(1,m.shot?1+Math.sin(m.shot.age*12)*.05:1,1);monsterArms.forEach((a,i)=>a.rotation.z=state.mode==='flick'?(i?-.9:1.5):reduced?0:Math.sin(t*(state.mode==='race'?6:2)+i)*.16);
  targetRing.visible=!!m.shot;ketchupShot.visible=!!m.shot&&m.shot.age>=.65;
  if(m.shot){targetRing.position.set(m.shot.target.x,0,m.shot.target.z);targetCircle.scale.setScalar(.9+Math.sin(t*12)*.1);const p=shotPosition(m.shot);ketchupShot.position.set(p.x,p.y,p.z);}
  for(const p of state.splats){let o=puddles.get(p.id);if(!o){o=ball(scene,red,p.x,.025,p.z,1.3,.035,1.1);o.castShadow=o.receiveShadow=false;puddles.set(p.id,o);}o.scale.y=Math.max(.004,p.life/3*.035);}
@@ -223,7 +240,7 @@ function animate(){
  if((uiTime+=dt)>.1){uiTime=0;refreshHud();}renderer.render(scene,camera);
 }
 addEventListener('resize',()=>{renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,1.6));camera.aspect=innerWidth/innerHeight;camera.fov=innerWidth<700?57:45;camera.updateProjectionMatrix();});
-const readState=()=>({player:{x:state.x,y:state.y,z:state.z},mode:state.mode,time:state.time,mixer:state.mixer,apronColor:state.apronColor,nearby:nearby(state),race:state.race,orbit:state.orbit,ride:state.ride,monster:state.monster,spices:state.found,badges:state.badges,squirts:state.squirts,wins:state.wins,losses:state.losses,paused:paused(),landmarks:{start:START,finish:FINISH,shower:SHOWER,pickle:BOUNCE,sauceLab:MIXER,spices:SPICES},maze:{walls:WALLS,route:state.hints?ROUTE:undefined}});
+const readState=()=>({player:{x:state.x,y:state.y,z:state.z},mode:state.mode,time:state.time,mixer:state.mixer,apronColor:state.apronColor,carriedSauce:state.carriedSauce,sauceShot:state.sauceShot,sauceAim:sauceAim(state),sauceHits:state.sauceHits,nearby:nearby(state),race:state.race,orbit:state.orbit,ride:state.ride,monster:state.monster,spices:state.found,badges:state.badges,squirts:state.squirts,wins:state.wins,losses:state.losses,paused:paused(),landmarks:{start:START,finish:FINISH,shower:SHOWER,pickle:BOUNCE,sauceLab:MIXER,spices:SPICES},maze:{walls:WALLS,route:state.hints?ROUTE:undefined}});
 if(document.modelContext?.registerTool){
  const lifecycle=new AbortController(),register=t=>{try{Promise.resolve(document.modelContext.registerTool(t,{signal:lifecycle.signal})).catch(()=>{});}catch{}};
  register({name:'read_spice_world',description:'Read Spice World, the explorer, Squeeze, maze race, spice friends, sauce lab recipes and two-lap flight. Maze route is visible only after enabling the normal mustard trail.',inputSchema:{type:'object',properties:{},additionalProperties:false},annotations:{readOnlyHint:true},execute:readState});
