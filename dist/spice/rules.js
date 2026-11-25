@@ -2,7 +2,7 @@ export const TAU = Math.PI * 2;
 export const MAZE = { cols: 6, rows: 5, size: 6, left: -18, top: -23 };
 export const START = { x: -15, z: 11 }, FINISH = { x: 15, z: -27 }, SPAWN = { x: 0, z: 24 };
 export const SHOWER = { x: -24, z: 21 }, BOUNCE = { x: 20, z: 20 }, MIXER = { x: 23, z: 12 };
-export const RACE_SPEED=5.5, RACE_HEAD_START=1;
+export const RACE_SPEED=7, RACE_HEAD_START=1;
 export const FINISH_HALF_WIDTH=3, FINISH_LINE_Z=FINISH.z+.35, SAUCE_RANGE=14;
 export const SAUCES=[
  {id:'ketchup',name:'Ketchup',color:'#f54c53'},
@@ -55,10 +55,10 @@ export function routePose(distance){
 }
 export function createState(){return{
  ...SPAWN,y:0,vy:0,yaw:Math.PI,time:0,mode:'explore',race:null,ride:null,orbit:null,
- monster:{x:5,z:15,yaw:0,cooldown:3,shot:null,color:'#d83c23',painted:0},splats:[],shotId:0,stain:0,bump:{x:0,z:0},
+ monster:{x:5,z:15,yaw:0,cooldown:3,shot:null,color:'#d83c23',sauceName:'Ketchup',painted:0},splats:[],shotId:0,stain:0,stainColor:'#d83c23',bump:{x:0,z:0},
  found:[],badges:{race:false,spices:false,comeback:false},wins:0,losses:0,bounces:0,squirts:0,
  bounceCooldown:0,showerCooldown:0,shield:3,hints:false,event:'',effect:null,
- mixer:{recipe:[],phase:'idle',time:0,pour:null,result:null,batches:0},apronColor:'#fff1cd',
+ mixer:{recipe:[],phase:'idle',time:0,pour:null,result:null,batches:0,ride:null},apronColor:'#fff1cd',
  carriedSauce:null,sauceShot:null,sauceCooldown:0,sauceHits:0,
 };}
 function say(s,event,effect=null){s.event=event;s.effect=effect;}
@@ -75,11 +75,11 @@ export function nearby(s){
 export function act(s){
  const near=nearby(s);if(!near)return false;
  if(near.kind==='mixer'){
-  s.mode='mixing';s.x=MIXER.x;s.z=MIXER.z+3.8;s.y=0;s.vy=0;s.yaw=Math.PI;s.bump={x:0,z:0};s.monster.shot=null;s.sauceShot=null;s.splats=[];say(s,'Welcome to the Sauce Lab! Pick two or more sauces, then mix!','lab');
+  s.mode='mixing';s.x=MIXER.x;s.z=MIXER.z+3.8;s.y=0;s.vy=0;s.yaw=Math.PI;s.bump={x:0,z:0};s.monster.shot=null;s.sauceShot=null;s.splats=[];say(s,'Welcome to the Sauce Lab! Add two or more squirts—even the same sauce—then mix!','lab');
  }else if(near.kind==='mix')return stirSauces(s);
  else if(near.kind==='race'){
-  Object.assign(s,{...START,y:0,vy:0,yaw:Math.PI,stain:0,bump:{x:0,z:0},mode:'countdown',race:{elapsed:0,countdown:3,checkpoint:1,monsterDistance:0},splats:[]});
-  Object.assign(s.monster,{...START,shot:null,yaw:Math.PI});s.sauceShot=null;say(s,'Ready, steady… spaghetti! Follow the maze to the golden finish.','start');
+  Object.assign(s,{...START,y:0,vy:0,yaw:Math.PI,stain:0,bump:{x:0,z:0},mode:'countdown',race:{elapsed:0,countdown:3,monsterDistance:0},splats:[]});
+  Object.assign(s.monster,{...START,shot:null,yaw:Math.PI});s.sauceShot=null;say(s,'Ready, steady… spaghetti! Pick any route to the golden finish—even around the maze!','start');
  }else if(near.kind==='hint'){s.hints=!s.hints;say(s,s.hints?'Follow the little mustard dots. You can do this!':'Mustard trail tucked away. Trust your spice instincts!');}
  else if(near.kind==='orbit'){s.orbit.cruise=!s.orbit.cruise;say(s,s.orbit.cruise?'French-fry wings, go! Two laps and you’re home.':'Hovering. Tap Fly or use your movement controls to keep going.');}
  else if(near.kind==='shower'){
@@ -108,15 +108,15 @@ export function clearSight(a,b){
 function squirt(s,dt){
  const m=s.monster;m.cooldown=Math.max(0,m.cooldown-dt);
  if(!m.shot&&m.cooldown===0&&s.shield===0&&dist(s,m)<7.5&&clearSight(m,s)){
-  m.shot={age:0,target:{x:s.x,z:s.z},from:{x:m.x,z:m.z}};m.cooldown=4;say(s,'Squeeze is aiming… dodge the ketchup ring!','aim');
+  m.shot={age:0,target:{x:s.x,z:s.z},from:{x:m.x,z:m.z},color:m.color,name:m.sauceName};m.cooldown=4;say(s,`Squeeze is aiming ${m.sauceName}! Dodge the sauce ring!`,'aim');
  }
  if(m.shot){
   const shot=m.shot;shot.age+=dt;
   if(shot.age>=1.35){
-   s.splats.push({...shot.target,id:s.shotId++,life:3});m.shot=null;
+   s.splats.push({...shot.target,id:s.shotId++,life:3,color:shot.color});m.shot=null;
    if(dist(s,shot.target)<1.65&&s.y<1.5&&s.shield===0){
-    const d=Math.max(.1,dist(s,shot.from));s.bump={x:(s.x-shot.from.x)/d*5,z:(s.z-shot.from.z)/d*5};s.stain=3;s.squirts++;s.shield=1;say(s,'PLOP! A little ketchup on your apron!','splat');
-   }else say(s,'Whoosh! Ketchup missed you.','miss');
+    const d=Math.max(.1,dist(s,shot.from));s.bump={x:(s.x-shot.from.x)/d*5,z:(s.z-shot.from.z)/d*5};s.stain=3;s.stainColor=shot.color;s.squirts++;s.shield=1;say(s,`PLOP! ${shot.name} on your apron!`,'splat');
+   }else say(s,`Whoosh! ${shot.name} missed you.`,'miss');
   }
  }
 }
@@ -163,7 +163,7 @@ export function tick(s,dt,input={x:0,z:0}){
  if(s.mode==='explore'&&s.bounceCooldown===0&&dist(s,BOUNCE)<2.6&&s.y<.3){s.vy=16;s.y=.05;s.bounceCooldown=2.2;s.bounces++;say(s,'DILL-IGHTFUL! Pickle trampoline!','bounce');}
  SPICES.forEach((p,i)=>{if(!s.found.includes(i)&&dist(s,p)<1.6&&s.y<2){s.found.push(i);say(s,`${p.name} joins your spice club! ${s.found.length} / 6.`, 'spice');if(s.found.length===6){s.badges.spices=true;say(s,'THE SPICE CLUB IS COMPLETE! A crown for your collection.','badge');}}});
  if(s.mode==='race'){
-  const r=s.race,finishFraction=advanceRace(r,before,s),arrival=r.elapsed+finishFraction*dt;r.elapsed+=dt;
+  const r=s.race,finishFraction=finishEntry(before,s),arrival=r.elapsed+finishFraction*dt;r.elapsed+=dt;
   if(Number.isFinite(finishFraction)&&arrival<=RACE_FINISH_TIME+1e-9){s.monster.returnDistance=Math.max(0,arrival-RACE_HEAD_START)*RACE_SPEED;s.mode='explore';s.race=null;s.wins++;s.badges.race=true;s.shield=8;s.sauceShot=null;say(s,'YOU BEAT SQUEEZE! The Golden Squeeze Cup is yours!','win');return;}
   r.monsterDistance=Math.max(0,r.elapsed-RACE_HEAD_START)*RACE_SPEED;Object.assign(s.monster,routePose(r.monsterDistance));
   if(r.elapsed>=RACE_FINISH_TIME)lose(s);else tickSauceShot(s,dt);return;
@@ -176,33 +176,20 @@ export function tick(s,dt,input={x:0,z:0}){
  m.yaw=Math.atan2(s.x-m.x,s.z-m.z);squirt(s,dt);
 }
 
-// Check the whole traversable cell, not an invisible circle at its center.
-// Swept rectangles also recognize corners crossed between frames.
-function cellEntry(from,to,p,after=0){
- let enter=after,leave=1;
- for(const axis of ['x','z']){
-  const delta=to[axis]-from[axis],lo=p[axis]-MAZE.size/2,hi=p[axis]+MAZE.size/2;
+// Any route is fair. Detect entry into the visible stripe from any direction,
+// including between frames, and compare the actual arrival time with Squeeze's.
+function finishEntry(from,to){
+ let enter=0,leave=1;
+ for(const [axis,half] of [['x',FINISH_HALF_WIDTH],['z',.35]]){
+  const delta=to[axis]-from[axis],lo=FINISH[axis]-half,hi=FINISH[axis]+half;
   if(Math.abs(delta)<1e-9){if(from[axis]<lo||from[axis]>hi)return Infinity;}
   else{const a=(lo-from[axis])/delta,b=(hi-from[axis])/delta;enter=Math.max(enter,Math.min(a,b));leave=Math.min(leave,Math.max(a,b));}
  }
  return enter<=leave?enter:Infinity;
 }
-function advanceRace(r,from,to){
- let fraction=0;
- while(r.checkpoint<ROUTE.length-1){
-  const entry=cellEntry(from,to,ROUTE[r.checkpoint],fraction);
-  if(!Number.isFinite(entry))return Infinity;
-  fraction=entry;r.checkpoint++;
- }
- // Both racers cross the same visible stripe; jumping and either edge count.
- if(from.z<FINISH_LINE_Z||to.z>FINISH_LINE_Z)return Infinity;
- const dz=to.z-from.z,u=dz===0?0:(FINISH_LINE_Z-from.z)/dz;
- const x=from.x+(to.x-from.x)*u;
- return u>=fraction&&u<=1&&Math.abs(x-FINISH.x)<=FINISH_HALF_WIDTH?u:Infinity;
-}
 
 export function takeSauce(s){
- if(s.mode!=='mixing'||!s.mixer.result||s.mixer.phase==='stirring')return false;
+ if(s.mode!=='mixing'||!s.mixer.result||s.mixer.phase==='stirring'||s.mixer.ride)return false;
  s.carriedSauce={...s.mixer.result};closeMixer(s);
  say(s,`${s.carriedSauce.name}, bottled! Find Squeeze and tap Squirt or press Q.`, 'bottle');return true;
 }
@@ -229,7 +216,7 @@ function tickSauceShot(s,dt){
  if(shot.age>=.45){
   s.sauceShot=null;
   if(!clearSight(shot.from,s.monster)){say(s,'The sauce splashed a wall. Find a clear shot!');return;}
-  s.monster.color=shot.color;s.monster.painted=2;s.monster.shot=null;s.monster.cooldown=Math.max(2.5,s.monster.cooldown);s.sauceHits++;
+  s.monster.color=shot.color;s.monster.sauceName=shot.name;s.monster.painted=2;s.monster.shot=null;s.monster.cooldown=Math.max(2.5,s.monster.cooldown);s.sauceHits++;
   say(s,`SPLASH! Squeeze is ${shot.name} colored!`, 'sauce-hit');
  }
 }
@@ -241,36 +228,50 @@ export function sauceResult(recipe){
  const channels=[16,8,0].map(shift=>Math.round(sauces.reduce((n,s)=>n+((parseInt(s.color.slice(1),16)>>shift)&255),0)/sauces.length));
  const color='#'+channels.map(n=>n.toString(16).padStart(2,'0')).join('');
  const unique=[...new Set(sauces.map(s=>s.id))].sort(),pair=unique.join('+');
- const names={'ketchup+mustard':'Sunset Sizzle','berry+garlic':'Purple Cloud','berry+mustard':'Confetti Custard','garlic+pesto':'Minty Moon','ketchup+pesto':'Garden Giggles','bbq+ketchup':'Dragon Drizzle','berry+ketchup':'Berry Volcano','garlic+ketchup':'Pink Comet','mustard+pesto':'Lime Lightning'};
- return{name:unique.length>=4?'Rainbow Ruckus':unique.length===3?'Triple Swirl Surprise':names[pair]||'Secret Sauce Swirl',color};
+ const names={'ketchup+mustard':'Lava sauce','berry+garlic':'Purple Cloud','berry+mustard':'Confetti Custard','garlic+pesto':'Minty Moon','ketchup+pesto':'Garden Giggles','bbq+ketchup':'Dragon Drizzle','berry+ketchup':'Berry Volcano','garlic+ketchup':'Pink Comet','mustard+pesto':'Lime Lightning'};
+ return{name:unique.length===1?`${sauces[0].name} swirl`:unique.length>=4?'Rainbow Ruckus':unique.length===3?'Triple Swirl Surprise':names[pair]||'Secret Sauce Swirl',color};
 }
 export function addSauce(s,id){
  const m=s.mixer;
- if(s.mode!=='mixing'||m.phase==='stirring'||!SAUCES.some(a=>a.id===id)||m.recipe.length>=4)return false;
+ if(s.mode!=='mixing'||m.phase==='stirring'||m.ride||!SAUCES.some(a=>a.id===id)||m.recipe.length>=4)return false;
  m.recipe.push(id);m.phase='idle';m.time=0;m.result=null;m.pour={id,left:.8};
  say(s,`${SAUCES.find(a=>a.id===id).name}… glug glug! ${m.recipe.length} / 4 squirts.`, 'pour');return true;
 }
 export function clearRecipe(s){
- if(s.mode!=='mixing'||s.mixer.phase==='stirring')return false;
+ if(s.mode!=='mixing'||s.mixer.phase==='stirring'||s.mixer.ride)return false;
  Object.assign(s.mixer,{recipe:[],phase:'idle',time:0,pour:null,result:null});say(s,'A fresh bowl. What will you make next?');return true;
 }
 export function stirSauces(s){
  const m=s.mixer;
- if(s.mode!=='mixing'||m.phase==='stirring')return false;
- if(new Set(m.recipe).size<2){say(s,'Choose at least two different sauces for a colorful mix!');return false;}
+ if(s.mode!=='mixing'||m.phase==='stirring'||m.ride)return false;
+ if(m.recipe.length<2){say(s,'Add at least two squirts. The same sauce twice is great too!');return false;}
  m.phase='stirring';m.time=0;m.pour=null;m.result=null;say(s,'Whirrr… swirl… get ready for the sauce fountain!', 'stir');return true;
 }
 export function closeMixer(s){
  if(s.mode!=='mixing')return false;
  s.mode='explore';s.shield=Math.max(4,s.shield);s.mixer.pour=null;
+ if(s.mixer.ride){Object.assign(s,{x:MIXER.x,z:MIXER.z+3.8,y:0,vy:0,yaw:Math.PI});s.mixer.ride=null;}
  if(s.mixer.phase!=='idle'){s.mixer.phase='idle';s.mixer.time=0;}
  say(s,'See you at the Sauce Lab! Your recipe is saved for this visit.');return true;
 }
+export function rideMixer(s){
+ if(!stirSauces(s))return false;
+ s.mixer.ride={time:0,start:{x:s.x,y:s.y,z:s.z}};
+ say(s,'You’re the secret ingredient! Hop in, swirl, and bounce out!', 'bowl-hop');return true;
+}
+export function mixerRidePose(ride){
+ const t=ride.time,inside={x:MIXER.x,y:2.9,z:MIXER.z+1.05},outside={x:MIXER.x,y:0,z:MIXER.z+3.8};
+ if(t<.9){const u=clamp(t/.9,0,1),e=smooth(u);return{x:lerp(ride.start.x,inside.x,e),y:lerp(ride.start.y,inside.y,e)+Math.sin(u*Math.PI)*3,z:lerp(ride.start.z,inside.z,e),yaw:Math.PI};}
+ if(t<4.4){const u=(t-.9)/3.5,a=smooth(u)*TAU*4;return{x:MIXER.x+Math.sin(a)*1.65,y:2.9+Math.sin(a*2)*.16,z:MIXER.z-.6+Math.cos(a)*1.65,yaw:Math.PI+a};}
+ const u=clamp((t-4.4)/1.2,0,1),e=smooth(u);return{x:lerp(inside.x,outside.x,e),y:lerp(inside.y,outside.y,e)+Math.sin(u*Math.PI)*4,z:lerp(inside.z,outside.z,e),yaw:Math.PI};
+}
 function tickMixer(s,dt){
  const m=s.mixer;
+ if(m.ride){m.ride.time+=dt;Object.assign(s,mixerRidePose(m.ride));}
  if(m.pour){m.pour.left=Math.max(0,m.pour.left-dt);if(m.pour.left===0)m.pour=null;}
  if(m.phase==='stirring'){
-  m.time+=dt;
+  m.time+=m.ride?Math.min(dt,Math.max(0,m.ride.time-.9)):dt;
   if(m.time>=3.5){m.phase='party';m.time=0;m.result=sauceResult(m.recipe);m.batches++;s.apronColor=m.result.color;s.stain=0;say(s,`${m.result.name}! A rainbow splash and a brand-new apron color.`, 'mix-party');}
  }else if(m.phase==='party'){m.time+=dt;if(m.time>=5){m.phase='idle';m.time=0;}}
+ if(m.ride?.time>=5.6){m.ride=null;Object.assign(s,{x:MIXER.x,z:MIXER.z+3.8,y:0,vy:0,yaw:Math.PI});}
 }

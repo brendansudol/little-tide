@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {TAU,START,FINISH,SPAWN,SHOWER,BOUNCE,MIXER,SAUCES,RACE_SPEED,RACE_HEAD_START,RACE_FINISH_TIME,FINISH_LINE_Z,SPICES,WALLS,LINKS,ROUTE,ROUTE_CELLS,ROUTE_LENGTH,cellPoint,cellRoute,createState,nearby,act,addSauce,clearRecipe,stirSauces,closeMixer,sauceResult,takeSauce,sauceAim,squirtSauce,sauceShotPosition,jump,home,tick,move,dist,clearSight,routePose,recoveryPose,shotPosition} from '../dist/spice/rules.js';
+import {TAU,START,FINISH,SPAWN,SHOWER,BOUNCE,MIXER,SAUCES,RACE_SPEED,RACE_HEAD_START,RACE_FINISH_TIME,FINISH_LINE_Z,SPICES,WALLS,LINKS,ROUTE,ROUTE_CELLS,ROUTE_LENGTH,cellPoint,cellRoute,createState,nearby,act,addSauce,clearRecipe,stirSauces,rideMixer,mixerRidePose,closeMixer,sauceResult,takeSauce,sauceAim,squirtSauce,sauceShotPosition,jump,home,tick,move,dist,clearSight,routePose,recoveryPose,shotPosition} from '../dist/spice/rules.js';
 const step=(s,seconds,input={x:0,z:0},fps=60)=>{for(let i=0;i<Math.ceil(seconds*fps);i++)tick(s,1/fps,input);};
 const place=(s,p)=>Object.assign(s,{x:p.x,z:p.z,y:0,vy:0});
 const close=(a,b)=>assert.ok(dist(a,b)<.001,`${JSON.stringify(a)} / ${JSON.stringify(b)}`);
@@ -30,8 +30,13 @@ test('Walking away or jumping over a squirt avoids it; walls block ketchup aim',
 test('The race has a countdown and head start, and is winnable through the real maze at different frame rates',()=>{
  for(const fps of [30,60,120]){const s=createState();place(s,START);act(s);const start={x:s.x,z:s.z};step(s,2,{x:1,z:0},fps);close(s,start);assert.equal(s.mode,'countdown');step(s,1.1,undefined,fps);assert.equal(s.mode,'race');assert.equal(s.race.monsterDistance,0);assert.ok(act(s));assert.equal(s.hints,true);followRoute(s,fps);assert.equal(s.mode,'explore');assert.equal(s.wins,1);assert.ok(s.badges.race);assert.equal(s.losses,0);assert.equal(s.squirts,0);assert.ok(s.monster.returnDistance>0);step(s,20,undefined,fps);assert.equal(s.monster.returnDistance,0);}
 });
-test('Running around the outside cannot skip the maze race checkpoints',()=>{
- const s=startRace();place(s,FINISH);step(s,.1);assert.equal(s.mode,'race');assert.equal(s.wins,0);assert.equal(s.race.checkpoint,1);step(s,RACE_FINISH_TIME);assert.equal(s.losses,1);assert.equal(s.mode,'flick');assert.equal(s.race,null);
+test('Racing around either side of the maze counts, including a rear approach to the stripe',()=>{
+ const routes=[
+  [{x:-20,z:11},{x:-20,z:-27},{x:15,z:-27}],
+  [{x:20,z:11},{x:20,z:-27},{x:15,z:-27}],
+  [{x:-20,z:11},{x:-20,z:-29},{x:15,z:-29},{x:15,z:-27}],
+ ];
+ for(const fps of [30,60,120])for(const path of routes){const s=startRace();walkPath(s,path,fps);assert.equal(s.wins,1);assert.equal(s.losses,0);assert.ok(s.badges.race);step(s,15,undefined,fps);assert.equal(s.losses,0);assert.equal(s.wins,1);}
 });
 test('A loss launches the explorer onto a fry and requires two actual laps before returning',()=>{
  for(const fps of [30,60,120]){const s=startRace();s.found=[0,1];s.badges.spices=true;step(s,RACE_FINISH_TIME,undefined,fps);assert.equal(s.mode,'flick');assert.equal(jump(s),false);assert.equal(home(s),false);step(s,2.4,undefined,fps);assert.equal(s.mode,'orbit');assert.equal(s.orbit.angle,0);close(s,{x:50,z:0});step(s,3,undefined,fps);assert.equal(s.orbit.angle,0);assert.equal(home(s),false);
@@ -52,16 +57,16 @@ test('Six spice friends award one crown, pickle jumps land safely, and Home pres
 });
 
 test('Squeeze is a fast, fair rival: brief head start, steady pace, and no time for a long pause',()=>{
- assert.equal(RACE_HEAD_START,1);assert.ok(RACE_SPEED>=5);assert.ok(RACE_FINISH_TIME<17);
+ assert.equal(RACE_HEAD_START,1);assert.ok(RACE_SPEED>=7);assert.ok(RACE_FINISH_TIME<12.5);
  for(const fps of [30,60,120]){const s=startRace();step(s,3,undefined,fps);assert.ok(Math.abs(s.race.monsterDistance-(s.race.elapsed-RACE_HEAD_START)*RACE_SPEED)<.001);step(s,4,undefined,fps);followRoute(s,fps);assert.equal(s.wins,0);assert.ok(['flick','orbit'].includes(s.mode));}
 });
 function openLab(){const s=createState();place(s,MIXER);assert.equal(nearby(s).kind,'mixer');act(s);assert.equal(s.mode,'mixing');return s;}
-test('The Sauce Lab accepts only valid sauces, limits the bowl, and needs two different ingredients',()=>{
+test('The Sauce Lab accepts valid sauces and limits the bowl to four squirts',()=>{
  const s=createState();assert.equal(addSauce(s,'ketchup'),false);place(s,MIXER);act(s);assert.equal(stirSauces(s),false);assert.equal(addSauce(s,'mystery'),false);assert.equal(s.mixer.recipe.length,0);
- addSauce(s,'ketchup');addSauce(s,'ketchup');assert.equal(stirSauces(s),false);addSauce(s,'mustard');addSauce(s,'berry');assert.equal(s.mixer.recipe.length,4);assert.equal(addSauce(s,'pesto'),false);assert.equal(stirSauces(s),true);assert.equal(addSauce(s,'pesto'),false);assert.equal(clearRecipe(s),false);assert.equal(stirSauces(s),false);
+ addSauce(s,'ketchup');assert.equal(stirSauces(s),false);addSauce(s,'ketchup');addSauce(s,'mustard');addSauce(s,'berry');assert.equal(s.mixer.recipe.length,4);assert.equal(addSauce(s,'pesto'),false);assert.equal(stirSauces(s),true);assert.equal(addSauce(s,'pesto'),false);assert.equal(clearRecipe(s),false);assert.equal(stirSauces(s),false);
 });
 test('Mixing finishes once with a named blended color, a fountain, and a matching apron at all frame rates',()=>{
- for(const fps of [30,60,120]){const s=openLab();addSauce(s,'ketchup');addSauce(s,'mustard');const expected=sauceResult(s.mixer.recipe);assert.equal(expected.name,'Sunset Sizzle');stirSauces(s);step(s,3,undefined,fps);assert.equal(s.mixer.batches,0);step(s,.6,undefined,fps);assert.equal(s.mixer.phase,'party');assert.equal(s.mixer.batches,1);assert.deepEqual(s.mixer.result,expected);assert.equal(s.apronColor,expected.color);step(s,6,undefined,fps);assert.equal(s.mixer.phase,'idle');assert.equal(s.mixer.batches,1);assert.ok(clearRecipe(s));addSauce(s,'berry');addSauce(s,'garlic');stirSauces(s);step(s,3.6,undefined,fps);assert.equal(s.mixer.result.name,'Purple Cloud');assert.equal(s.mixer.batches,2);}
+ for(const fps of [30,60,120]){const s=openLab();addSauce(s,'ketchup');addSauce(s,'mustard');const expected=sauceResult(s.mixer.recipe);assert.equal(expected.name,'Lava sauce');stirSauces(s);step(s,3,undefined,fps);assert.equal(s.mixer.batches,0);step(s,.6,undefined,fps);assert.equal(s.mixer.phase,'party');assert.equal(s.mixer.batches,1);assert.deepEqual(s.mixer.result,expected);assert.equal(s.apronColor,expected.color);step(s,6,undefined,fps);assert.equal(s.mixer.phase,'idle');assert.equal(s.mixer.batches,1);assert.ok(clearRecipe(s));addSauce(s,'berry');addSauce(s,'garlic');stirSauces(s);step(s,3.6,undefined,fps);assert.equal(s.mixer.result.name,'Purple Cloud');assert.equal(s.mixer.batches,2);}
  const a=sauceResult(['ketchup','mustard']),b=sauceResult(['mustard','ketchup']);assert.deepEqual(a,b);assert.notEqual(sauceResult(['ketchup','ketchup','mustard']).color,a.color);assert.equal(sauceResult(SAUCES.map(s=>s.id)).name,'Rainbow Ruckus');
 });
 test('Lab play prevents ketchup attacks and leaving cancels unfinished mixes without a reward',()=>{
@@ -76,13 +81,13 @@ function walkPath(s,path,fps=60){
  for(const p of path){let frames=0;while(dist(s,p)>.025&&s.mode==='race'&&frames++<fps*8){const d=dist(s,p),a=Math.min(1,d/(7.2/fps));tick(s,1/fps,{x:(p.x-s.x)/d*a,z:(p.z-s.z)/d*a});}if(s.mode==='race')assert.ok(dist(s,p)<.025,'Path must traverse real walls');}
 }
 test('Wall-hugging through the maze wins at the visible stripe and can never be flicked afterward',()=>{
- // This legal route missed every old 2.2-radius center checkpoint and reproduced the reported loss.
- const path=[[-17.22,11],[-17.22,6.22],[-.78,6.22],[-.78,-4.22],[-11.22,-4.22],[-11.22,-16.22],[-.78,-16.22],[-.78,-22.22],[17.22,-22.22],[17.22,-27.3]].map(([x,z])=>({x,z}));
+ // The first corridor hugs the wall, outside the old invisible center checkpoints.
+ const path=[{x:-17.22,z:11},{x:-17.22,z:6.22},{x:-3,z:6.22},...ROUTE.slice(4)];
  for(const fps of [30,60,120]){const s=startRace();walkPath(s,path,fps);assert.equal(s.wins,1);assert.equal(s.losses,0);assert.equal(s.mode,'explore');assert.ok(s.badges.race);step(s,20,undefined,fps);assert.equal(s.losses,0);assert.equal(s.mode,'explore');}
 });
-test('Both edges of the finish stripe count, including jumps, without an outside-maze shortcut',()=>{
+test('Both edges of the finish stripe count, including jumps',()=>{
  for(const fps of [30,60,120])for(const side of [-1,1]){const s=startRace();walkPath(s,ROUTE.slice(1,-1),fps);walkPath(s,[{x:15,z:-24.5},{x:15+side*2.8,z:-24.5}],fps);jump(s);walkPath(s,[{x:s.x,z:-27}],fps);assert.equal(s.wins,1);assert.equal(s.losses,0);}
- const s=startRace();walkPath(s,[{x:-22,z:11},{x:-22,z:-27.5},{x:15,z:-27.5}],60);assert.equal(s.wins,0);
+ const s=startRace();place(s,{x:19,z:-27});tick(s,.02);assert.equal(s.wins,0);assert.equal(s.mode,'race');
 });
 test('Close finishes compare actual crossing times within the frame; ties favor the player',()=>{
  for(const fps of [30,60,120])for(const margin of [-.003,0,.003]){const s=startRace();walkPath(s,ROUTE.slice(1,-1),fps);place(s,{x:15,z:FINISH_LINE_Z+.05});const crossing=.05/7.2;s.race.elapsed=RACE_FINISH_TIME-crossing+margin;tick(s,1/fps,{x:0,z:-1});assert.equal(s.wins,margin<=0?1:0);assert.equal(s.losses,margin<=0?0:1);}
@@ -91,7 +96,7 @@ function bottledSauce(first='berry',second='garlic'){const s=openLab();addSauce(
 test('Only finished sauce can be bottled, and the carried recipe survives clearing, travel, and unfinished mixes',()=>{
  const s=openLab();assert.equal(takeSauce(s),false);addSauce(s,'berry');addSauce(s,'garlic');stirSauces(s);assert.equal(takeSauce(s),false);step(s,3.6);assert.ok(takeSauce(s));assert.equal(s.mode,'explore');const bottle={...s.carriedSauce};assert.equal(bottle.name,'Purple Cloud');
  place(s,MIXER);act(s);clearRecipe(s);assert.deepEqual(s.carriedSauce,bottle);addSauce(s,'ketchup');addSauce(s,'mustard');stirSauces(s);step(s,1);home(s);assert.deepEqual(s.carriedSauce,bottle);place(s,SHOWER);act(s);assert.deepEqual(s.carriedSauce,bottle);
- place(s,MIXER);act(s);stirSauces(s);step(s,4);takeSauce(s);assert.equal(s.carriedSauce.name,'Sunset Sizzle');
+ place(s,MIXER);act(s);stirSauces(s);step(s,4);takeSauce(s);assert.equal(s.carriedSauce.name,'Lava sauce');
 });
 test('Aiming is forgiving, visible sauce travels before painting, and Squeeze keeps the mixed color',()=>{
  for(const fps of [30,60,120]){const s=bottledSauce();place(s,{x:7,z:17});Object.assign(s.monster,{x:5,z:15,cooldown:0});s.shield=0;tick(s,1/fps);assert.ok(s.monster.shot);assert.equal(sauceAim(s),'ready');const color=s.carriedSauce.color;assert.ok(squirtSauce(s));assert.equal(squirtSauce(s),false);assert.equal(s.monster.color,'#d83c23');close(sauceShotPosition(s.sauceShot),s.sauceShot.from);step(s,.25,undefined,fps);assert.equal(s.sauceHits,0);step(s,.25,undefined,fps);assert.equal(s.sauceHits,1);assert.equal(s.monster.color,color);assert.equal(s.monster.shot,null);assert.ok(s.monster.painted>0);step(s,1,undefined,fps);assert.equal(s.sauceHits,1);assert.ok(squirtSauce(s));step(s,.5,undefined,fps);assert.equal(s.sauceHits,2);home(s);assert.equal(s.monster.color,color);assert.equal(s.carriedSauce.color,color);}
@@ -102,6 +107,32 @@ test('Sauce cannot shoot through walls, out of reach, without a bottle, or durin
  // A clear shot cannot pass through a wall if Squeeze moves behind it during flight.
  s.mode='explore';place(s,{x:-22,z:15});Object.assign(s.monster,{x:-22,z:12});assert.ok(squirtSauce(s));Object.assign(s.monster,{x:-15,z:0});step(s,.5);assert.equal(s.sauceHits,0);assert.equal(s.monster.color,'#d83c23');
 });
-test('Painting during a race never changes its pace, checkpoints, or winner',()=>{
+test('Painting during a race never changes its pace or winner',()=>{
  const s=bottledSauce();place(s,START);act(s);step(s,3.1);assert.ok(squirtSauce(s));step(s,.5);assert.equal(s.sauceHits,1);assert.equal(s.mode,'race');assert.equal(s.race.monsterDistance,Math.max(0,s.race.elapsed-RACE_HEAD_START)*RACE_SPEED);followRoute(s);assert.equal(s.wins,1);assert.equal(s.losses,0);
+});
+
+
+test('Repeated colors mix, bottle and paint correctly; ketchup plus mustard is always Lava sauce',()=>{
+ for(const sauce of SAUCES){const s=openLab();addSauce(s,sauce.id);addSauce(s,sauce.id);assert.ok(stirSauces(s));step(s,3.6);assert.equal(s.mixer.result.color,sauce.color);assert.ok(takeSauce(s));assert.equal(s.carriedSauce.color,sauce.color);}
+ for(const recipe of [['ketchup','mustard'],['mustard','ketchup'],['ketchup','ketchup','mustard'],['mustard','mustard','ketchup','ketchup']])assert.equal(sauceResult(recipe).name,'Lava sauce');
+});
+test('The bowl ride hops in, mixes the explorer, rewards once, and returns safely at every frame rate',()=>{
+ for(const fps of [30,60,120]){const s=openLab();addSauce(s,'ketchup');addSauce(s,'ketchup');assert.ok(rideMixer(s));step(s,.95,undefined,fps);assert.ok(s.mixer.ride);assert.ok(s.y>2.7);assert.ok(dist(s,{x:MIXER.x,z:MIXER.z-.6})<2);assert.equal(s.mixer.batches,0);const before={x:s.x,z:s.z};step(s,.5,undefined,fps);assert.ok(dist(s,before)>.5);assert.equal(s.squirts,0);
+  assert.equal(rideMixer(s),false);assert.equal(addSauce(s,'berry'),false);assert.equal(clearRecipe(s),false);assert.equal(takeSauce(s),false);
+  step(s,3.1,undefined,fps);assert.equal(s.mixer.batches,1);assert.equal(s.apronColor,SAUCES[0].color);assert.ok(s.mixer.ride);assert.equal(takeSauce(s),false);step(s,1.2,undefined,fps);assert.equal(s.mixer.ride,null);assert.equal(s.mode,'mixing');assert.equal(s.y,0);close(s,{x:MIXER.x,z:MIXER.z+3.8});step(s,6,undefined,fps);assert.equal(s.mixer.batches,1);assert.ok(takeSauce(s));assert.equal(s.mode,'explore');
+ }
+});
+test('The bowl ride is continuous and can be exited early with movement, jump, close, or Home',()=>{
+ const ride={time:0,start:{x:MIXER.x,y:0,z:MIXER.z+3.8}};close(mixerRidePose(ride),ride.start);assert.equal(mixerRidePose(ride).y,0);
+ for(const time of [.9,4.4,5.6]){const a=mixerRidePose({...ride,time:time-1e-7}),b=mixerRidePose({...ride,time:time+1e-7});assert.ok(dist(a,b)<.001);assert.ok(Math.abs(a.y-b.y)<.001);}
+ for(const exit of ['walk','jump','close','home'])for(const time of [.4,2,4.8]){const s=openLab();addSauce(s,'berry');addSauce(s,'mustard');rideMixer(s);step(s,time);const earned=s.mixer.batches;
+  if(exit==='walk')tick(s,.02,{x:1,z:0});if(exit==='jump')jump(s);if(exit==='close')closeMixer(s);if(exit==='home')home(s);
+  assert.equal(s.mode,'explore');assert.equal(s.mixer.ride,null);assert.equal(s.mixer.phase,'idle');assert.ok(s.y<.1);assert.equal(s.mixer.batches,earned);step(s,7);assert.equal(s.mixer.batches,earned);
+ }
+ const s=openLab();assert.equal(rideMixer(s),false);assert.equal(s.mixer.ride,null);
+});
+test('Painted Squeeze squirts the mixed color back, including the projectile, puddle and apron stain',()=>{
+ for(const fps of [30,60,120]){const s=bottledSauce();place(s,{x:5,z:19});Object.assign(s.monster,{x:5,z:15,cooldown:0});s.shield=0;assert.ok(squirtSauce(s));step(s,.5,undefined,fps);assert.equal(s.monster.sauceName,'Purple Cloud');s.monster.cooldown=0;s.monster.shot=null;tick(s,1/fps);const shot=s.monster.shot;assert.ok(shot);assert.equal(shot.color,s.carriedSauce.color);assert.equal(shot.name,'Purple Cloud');step(s,1.4,undefined,fps);assert.ok(s.splats.some(p=>p.color===s.carriedSauce.color));assert.equal(s.stainColor,s.carriedSauce.color);assert.equal(s.squirts,1);
+  s.carriedSauce=sauceResult(['ketchup','mustard']);s.bump={x:0,z:0};s.sauceCooldown=0;place(s,{x:s.monster.x+1,z:s.monster.z+2});assert.ok(squirtSauce(s));step(s,.5,undefined,fps);s.shield=0;s.monster.cooldown=0;tick(s,1/fps);assert.equal(s.monster.shot.color,s.carriedSauce.color);assert.equal(s.monster.shot.name,'Lava sauce');
+ }
 });

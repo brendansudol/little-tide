@@ -1,5 +1,5 @@
 import * as THREE from '../vendor/three.module.js';
-import {TAU,MAZE,START,FINISH,SPAWN,SHOWER,BOUNCE,MIXER,SAUCES,RACE_HEAD_START,RACE_FINISH_TIME,FINISH_HALF_WIDTH,SPICES,WALLS,ROUTE,ROUTE_LENGTH,createState,nearby,act,addSauce,clearRecipe,stirSauces,closeMixer,sauceResult,takeSauce,sauceAim,squirtSauce,sauceShotPosition,jump,home,tick,shotPosition,dist,clamp} from './rules.js?v=sauce-3';
+import {TAU,MAZE,START,FINISH,SPAWN,SHOWER,BOUNCE,MIXER,SAUCES,RACE_HEAD_START,RACE_FINISH_TIME,FINISH_HALF_WIDTH,SPICES,WALLS,ROUTE,ROUTE_LENGTH,createState,nearby,act,addSauce,clearRecipe,stirSauces,rideMixer,closeMixer,sauceResult,takeSauce,sauceAim,squirtSauce,sauceShotPosition,jump,home,tick,shotPosition,dist,clamp} from './rules.js?v=sauce-4';
 const $=s=>document.querySelector(s),canvas=$('#world'),reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
 let renderer;
 try{renderer=new THREE.WebGLRenderer({canvas,antialias:true});}catch(error){$('#loading').innerHTML='<p>Spice World needs WebGL.<br>Please enable hardware acceleration and try again.</p>';throw error;}
@@ -99,7 +99,7 @@ for(const x of [-.5,.5]){ball(monsterBody,cream,x,2.6,1,.4,.48,.16);ball(monster
 ball(monsterBody,dark,0,1.95,1.2,.25,.13,.06);const labelPatch=ball(monsterBody,cream,0,1.25,1.08,.66,.4,.08);const ketchupMark=label('K',1,'#fff1cd','#b83e29');ketchupMark.position.set(0,1.28,1.2);monsterBody.add(ketchupMark);
 const monsterArms=[];for(const side of [-1,1]){const arm=group(side*1.3,2.3,0,monsterBody);ball(arm,monsterPaint,side*.5,-.2,0,.65,.22,.23);ball(arm,monsterPaint,side*1,-.15,0,.3);monsterArms.push(arm);ball(monsterBody,cream,side*.75,.1,.25,.5,.25,.7);}
 const monsterTag=label('SQUEEZE',4.3);monsterTag.position.y=5.4;monster.add(monsterTag);
-const targetRing=group();const targetCircle=ring(targetRing,1.65,.08,'#fff2ce',.09);targetRing.visible=false;const ketchupShot=ball(scene,red,0,0,0,.4);
+const targetRing=group();const targetCircle=ring(targetRing,1.65,.08,'#fff2ce',.09);targetRing.visible=false;const ketchupShot=ball(scene,red.clone(),0,0,0,.4);
 ketchupShot.visible=false;const puddles=new Map();
 // A little chef explorer, ready for a ketchup adventure.
 const player=group(),body=group(0,0,0,player),skin=mat('#e8b88f'),hair=mat('#6c4535');ball(body,green,0,1,0,.38,.58,.3);const apron=box(body,cream.clone(),0,1,.3,.65,.8,.08);ball(body,skin,0,1.84,0,.39,.42,.36);ball(body,hair,0,2.05,-.08,.4,.22,.3);for(const x of [-.13,.13])ball(body,dark,x,1.88,.34,.035);ball(body,pink,0,1.74,.36,.08,.035,.02);
@@ -108,7 +108,7 @@ const limbs=[];for(const side of [-1,1]){const leg=group(side*.22,.55,0,body);bo
 const carriedBottle=group(.58,1.15,.4,body),bottlePaint=mat('#fff1cd',{roughness:.3});
 ball(carriedBottle,bottlePaint,0,0,0,.2,.32,.2);cylinder(carriedBottle,cream,0,.29,0,.13,.12);mesh(new THREE.ConeGeometry(.1,.28,12),bottlePaint,carriedBottle,0,.48,0);carriedBottle.visible=false;
 const sauceDrops=Array.from({length:8},()=>{const o=ball(scene,mat('#fff1cd',{roughness:.25}),0,0,0,.15);o.visible=false;return o;});
-const apronSplat=ball(body,red,.1,1.06,.36,.17,.21,.02);apronSplat.visible=false;
+const apronSplat=ball(body,red.clone(),.1,1.06,.36,.17,.21,.02);apronSplat.visible=false;
 const crown=group(0,2.7,0,body);cylinder(crown,gold,0,0,0,.43,.15);for(let i=0;i<5;i++){const a=i/5*TAU;mesh(new THREE.ConeGeometry(.12,.3,6),gold,crown,Math.sin(a)*.35,.16,Math.cos(a)*.35);}crown.visible=false;
 // The recovery lap is outside the world; a french fry catches the explorer.
 const fry=group(0,-.2,0,player);box(fry,mustard,0,0,0,1.15,.35,3.6);box(fry,gold,0,.2,0,1.05,.06,3.45);for(const side of [-1,1]){const wing=box(fry,cream,side*1.2,.12,0,1.5,.12,.9);wing.rotation.z=side*.2;}fry.visible=false;const flightTag=label('YOU',4.7,'#fff2cb','#843c24');flightTag.position.y=4.2;player.add(flightTag);flightTag.visible=false;
@@ -129,7 +129,8 @@ function tone(f=550){if(!sound)return;try{audio??=new(window.AudioContext||windo
 function effects(){
  if(state.event)toast(state.event);
  if(state.effect){
-  if(['spice','badge','win','bounce','splat','go'].includes(state.effect))burst(state.x,state.y+2,state.z,state.effect==='win'?90:35);
+  if(['spice','badge','win','bounce','go'].includes(state.effect))burst(state.x,state.y+2,state.z,state.effect==='win'?90:35);
+  if(state.effect==='splat')burst(state.x,state.y+2,state.z,35,[state.stainColor,'#fff1cd']);
   if(state.effect==='sauce-hit')burst(state.monster.x,3,state.monster.z,70,[state.monster.color,'#fff1cd']);
   if(state.effect==='mix-party')burst(MIXER.x,6,MIXER.z-.6,100,state.mixer.recipe.map(id=>SAUCES.find(s=>s.id===id).color));
   if(state.effect==='shower')for(let i=0;i<5;i++)burst(SHOWER.x+(rand()-.5)*3,6,SHOWER.z+(rand()-.5)*3,18);
@@ -141,6 +142,7 @@ function interact(){if(paused())return;act(state);if(state.mode==='mixing')clear
 $('#interact').onclick=interact;
 for(const button of document.querySelectorAll('[data-sauce]'))button.onclick=()=>{if(paused())return;addSauce(state,button.dataset.sauce);effects();refreshHud();};
 $('#brew-sauce').onclick=()=>{if(paused())return;stirSauces(state);effects();refreshHud();};
+$('#ride-mixer').onclick=()=>{if(paused())return;rideMixer(state);clearControls();effects();refreshHud();canvas.focus({preventScroll:true});};
 $('#clear-sauce').onclick=()=>{if(paused())return;clearRecipe(state);effects();refreshHud();};
 $('#take-sauce').onclick=()=>{if(paused())return;takeSauce(state);clearControls();effects();refreshHud();canvas.focus({preventScroll:true});};
 function spray(){if(paused())return;squirtSauce(state);effects();refreshHud();canvas.focus({preventScroll:true});}
@@ -165,7 +167,7 @@ const map=$('#map').getContext('2d');
 function drawMap(){
  const point=(x,z)=>[120+x*3.5,120+z*3.5];map.fillStyle='#c56845';map.fillRect(0,0,240,240);map.fillStyle='#74432e';
  WALLS.forEach(b=>{const [x,z]=point(b.x-b.w/2,b.z-b.d/2);map.fillRect(x,z,b.w*3.5,b.d*3.5);});
- if(state.hints&&state.race){map.strokeStyle='#ffe4a0';map.lineWidth=2;map.setLineDash([3,4]);map.beginPath();ROUTE.slice(state.race.checkpoint-1).forEach((p,i)=>{const q=point(p.x,p.z);i?map.lineTo(...q):map.moveTo(...q);});map.stroke();map.setLineDash([]);}
+ if(state.hints&&state.race){map.strokeStyle='#ffe4a0';map.lineWidth=2;map.setLineDash([3,4]);map.beginPath();ROUTE.forEach((p,i)=>{const q=point(p.x,p.z);i?map.lineTo(...q):map.moveTo(...q);});map.stroke();map.setLineDash([]);}
  const dot=(p,r,color)=>{map.fillStyle=color;map.beginPath();map.arc(...point(p.x,p.z),r,0,TAU);map.fill();};
  SPICES.forEach((p,i)=>{if(!state.found.includes(i))dot(p,3,'#f3d58d');});dot(MIXER,4,'#bd8deb');dot(FINISH,5,'#fff0a6');dot(state.monster,4,'#ed4932');dot(state,4.5,'#fff7df');
 }
@@ -174,12 +176,12 @@ function refreshHud(){
  $('#zone').textContent=state.mode==='mixing'?'A splash of imagination':state.mode==='orbit'?'A french fry with a flight plan':state.mode==='race'?'The Great Sauce Race':state.y>3?'A little extra air seasoning':'Welcome to the sauce side';
  $('#spice-count').textContent=`✦ ${state.found.length} / 6 spice friends`;$('#badge-count').textContent=`${Object.values(state.badges).filter(Boolean).length} / 3 prizes`;
  for(const [id,earned] of Object.entries(state.badges)){$('#badge-'+id).classList.toggle('found',earned);$('#badge-'+id+' .check').textContent=earned?'✓':'○';}
- const button=$('#interact');button.classList.toggle('ready',!!near);button.disabled=!near||state.mode==='mixing'&&(state.mixer.phase==='stirring'||new Set(state.mixer.recipe).size<2);button.querySelector('strong').textContent=near?.name||'Meet the spice club';button.querySelector('small').textContent=near?.kind==='mixer'?'Six sauces. Your own colorful recipe.':near?.kind==='race'?'A maze, a rival, and one saucy trophy':near?.kind==='orbit'?'Two complete laps unlock your landing':near?.kind==='hint'?'A little help finding the golden exit':'Six little friends are in the maze';
+ const button=$('#interact');button.classList.toggle('ready',!!near);button.disabled=!near||state.mode==='mixing'&&(state.mixer.phase==='stirring'||state.mixer.ride||state.mixer.recipe.length<2);button.querySelector('strong').textContent=near?.name||'Meet the spice club';button.querySelector('small').textContent=near?.kind==='mixer'?'Six sauces. Your own colorful recipe.':near?.kind==='race'?'A maze, a rival, and one saucy trophy':near?.kind==='orbit'?'Two complete laps unlock your landing':near?.kind==='hint'?'A little help finding the golden exit':'Six little friends are in the maze';
  document.body.classList.toggle('active',active);document.body.classList.toggle('recovering',recovery);$('#home').disabled=recovery;$('#race-panel').hidden=!active||state.mode==='mixing';$('#leave-race').hidden=!['race','countdown'].includes(state.mode);
  $('#jump').disabled=['flick','return','countdown'].includes(state.mode);$('#jump').textContent=state.mode==='orbit'?(state.orbit.cruise?'Ⅱ':'↻'):'↑';$('#jump').setAttribute('aria-label',state.mode==='orbit'?(state.orbit.cruise?'Pause flying':'Fly around the world'):'Jump');
  let title='',detail='',progress=0,eyebrow='THE GREAT SAUCE RACE';
- if(state.mode==='countdown'){title=`Ready… ${Math.ceil(state.race.countdown)}`;detail='Start under the arch. Reach the golden maze exit!';progress=(3-state.race.countdown)/3;}
- if(state.mode==='race'){title=`${Math.max(0,Math.ceil(RACE_FINISH_TIME-state.race.elapsed))}s to beat Squeeze`;detail=state.race.elapsed<RACE_HEAD_START?'One-second head start. RUN!' :'Find the golden exit. Need help? Show the mustard trail.';progress=state.race.checkpoint/(ROUTE.length-1);}
+ if(state.mode==='countdown'){title=`Ready… ${Math.ceil(state.race.countdown)}`;detail='Any route counts—even around the maze. Cross the finish stripe!';progress=(3-state.race.countdown)/3;}
+ if(state.mode==='race'){title=`${Math.max(0,Math.ceil(RACE_FINISH_TIME-state.race.elapsed))}s to beat Squeeze`;detail=state.race.elapsed<RACE_HEAD_START?'One-second head start. RUN!' :'Through or around: cross the finish stripe first!';progress=state.race.monsterDistance/ROUTE_LENGTH;}
  if(state.mode==='flick'){title='Squeeze wins… FLICK!';detail='A flying french fry is coming to catch you.';progress=state.ride.time/2.3;eyebrow='A VERY SAUCY DETOUR';}
  if(state.mode==='orbit'){const laps=Math.min(2,Math.abs(state.orbit.angle)/TAU);title=`${Math.floor(laps)} / 2 laps · ${Math.floor((laps%1)*100)}%`;detail=state.orbit.cruise?'Flying! Two full laps and you land back home.':'Tap Fly, or hold W / ↑ / the joystick to circle the world.';progress=laps/2;eyebrow='THE FRENCH-FRY FLIGHT CLUB';}
  if(state.mode==='return'){title='Two laps! Home sweet sauce.';detail='Coming in for a soft landing. Your prizes are safe.';progress=1;eyebrow='A LITTLE COMEBACK';}
@@ -187,15 +189,16 @@ function refreshHud(){
  squirtButton.style.setProperty('--bottle-color',state.carriedSauce?.color||'#fff1cd');
  $('#squirt-title').textContent=aim==='ready'?'Squirt Squeeze!':aim==='far'?'Get closer to Squeeze':aim==='blocked'?'Find a clear shot':'Refilling…';
  $('#bottle-name').textContent=state.carriedSauce?.name||'';
- const m=state.mixer,mixing=state.mode==='mixing';$('#mix-panel').hidden=!mixing;document.body.classList.toggle('mixing',mixing);
+ const m=state.mixer,mixing=state.mode==='mixing';$('#mix-panel').hidden=!mixing;document.body.classList.toggle('mixing',mixing);document.body.classList.toggle('bowl-riding',!!m.ride);
  if(mixing){
-  $('#mix-title').textContent=m.phase==='stirring'?'Whirl, swirl, splash…':m.phase==='party'?'A fountain of flavor!':'A splash of imagination.';
-  $('#mix-description').textContent=m.phase==='stirring'?'Your sauces are swirling together!':m.recipe.length===4?'Bowl full! Mix it, or empty it to try again.':'Pick 2 different sauces. Up to 4 squirts!';
+  $('#mix-title').textContent=m.ride?'You’re the secret ingredient!':m.phase==='stirring'?'Whirl, swirl, splash…':m.phase==='party'?'A fountain of flavor!':'A splash of imagination.';
+  $('#mix-description').textContent=m.ride?'Round and round… then a bouncy landing!':m.phase==='stirring'?'Your sauces are swirling together!':m.recipe.length===4?'Bowl full! Mix it, or empty it to try again.':'Add 2–4 squirts. Same colors welcome!';
   $('#mix-count').textContent=`${m.recipe.length} / 4 squirts`;
   $('#mix-slots').innerHTML=Array.from({length:4},(_,i)=>`<i style="background:${m.recipe[i]?SAUCES.find(s=>s.id===m.recipe[i]).color:'transparent'}"></i>`).join('');
-  for(const b of document.querySelectorAll('[data-sauce]'))b.disabled=m.phase==='stirring'||m.recipe.length>=4;
-  $('#brew-sauce').disabled=m.phase==='stirring'||new Set(m.recipe).size<2;$('#brew-sauce').textContent=m.phase==='stirring'?'Mixing…':'Mix & splash!';$('#clear-sauce').disabled=m.phase==='stirring';
-  $('#take-sauce').hidden=!m.result;$('#take-sauce').disabled=m.phase==='stirring';
+  for(const b of document.querySelectorAll('[data-sauce]'))b.disabled=m.phase==='stirring'||!!m.ride||m.recipe.length>=4;
+  $('#brew-sauce').disabled=m.phase==='stirring'||!!m.ride||m.recipe.length<2;$('#brew-sauce').textContent=m.phase==='stirring'?'Mixing…':'Mix & splash!';$('#clear-sauce').disabled=m.phase==='stirring'||!!m.ride;
+  $('#ride-mixer').disabled=m.phase==='stirring'||!!m.ride||m.recipe.length<2;$('#ride-mixer').textContent=m.ride?'Wheeee! Mixing you…':'Jump in & mix me!';
+  $('#take-sauce').hidden=!m.result;$('#take-sauce').disabled=m.phase==='stirring'||!!m.ride;
   $('#mix-result').hidden=!m.result;$('#mix-result').textContent=m.result?`${m.result.name} · ${m.batches} ${m.batches===1?'batch':'batches'} made!`:'';
  }
  $('#race-title').textContent=title;$('#race-detail').textContent=detail;$('#race-eyebrow').textContent=eyebrow;$('#race-progress').style.width=`${clamp(progress,0,1)*100}%`;drawMap();
@@ -219,17 +222,18 @@ function animate(){
  if(state.carriedSauce)bottlePaint.color.set(state.carriedSauce.color);
  sauceDrops.forEach((o,i)=>{const shot=state.sauceShot;o.visible=!!shot&&shot.age>i*.025;if(o.visible){const p=sauceShotPosition(shot,i*.025);o.position.set(p.x,p.y,p.z);o.material.color.set(shot.color);o.scale.setScalar(.18-i*.012);}});
  monsterPaint.color.set(state.monster.color);
- player.position.set(state.x,state.y,state.z);player.rotation.set(0,state.yaw,state.mode==='flick'&&!reduced?Math.sin(state.ride.time*5)*.6:0);player.scale.setScalar(recovery?2:1);fry.visible=recovery;flightTag.visible=recovery;apronSplat.visible=state.stain>0;crown.visible=state.badges.spices;
- const moving=!isPaused&&!recovery&&state.mode!=='countdown'&&!mixing&&Math.hypot(input.x,input.z)>.1;if(moving)walkPhase+=dt*11;limbs.forEach((l,i)=>l.rotation.x=moving?Math.sin(walkPhase+(i<2?0:Math.PI))*.5:0);if(recovery)limbs.forEach((l,i)=>{l.rotation.x=i%2?-.7:0;});
+ player.position.set(state.x,state.y,state.z);player.rotation.set(0,mix.ride&&reduced?Math.PI:state.yaw,mix.ride&&!reduced?Math.sin(mix.ride.time*9)*.2:state.mode==='flick'&&!reduced?Math.sin(state.ride.time*5)*.6:0);player.scale.setScalar(recovery?2:1);fry.visible=recovery;flightTag.visible=recovery;apronSplat.visible=state.stain>0;crown.visible=state.badges.spices;
+ const moving=!isPaused&&!recovery&&state.mode!=='countdown'&&!mixing&&Math.hypot(input.x,input.z)>.1;if(moving)walkPhase+=dt*11;limbs.forEach((l,i)=>l.rotation.x=moving?Math.sin(walkPhase+(i<2?0:Math.PI))*.5:0);if(mix.ride)limbs.forEach((l,i)=>{l.rotation.x=i%2?-1.8:Math.sin(t*6+i)*.3;});if(recovery)limbs.forEach((l,i)=>{l.rotation.x=i%2?-.7:0;});
  const m=state.monster;monster.position.set(m.x,reduced?0:m.painted>0?Math.abs(Math.sin(m.painted*9))*.6:Math.sin(t*3)*.07,m.z);monster.rotation.y=m.yaw;monsterBody.scale.set(1,m.shot?1+Math.sin(m.shot.age*12)*.05:1,1);monsterArms.forEach((a,i)=>a.rotation.z=state.mode==='flick'?(i?-.9:1.5):reduced?0:Math.sin(t*(state.mode==='race'?6:2)+i)*.16);
  targetRing.visible=!!m.shot;ketchupShot.visible=!!m.shot&&m.shot.age>=.65;
- if(m.shot){targetRing.position.set(m.shot.target.x,0,m.shot.target.z);targetCircle.scale.setScalar(.9+Math.sin(t*12)*.1);const p=shotPosition(m.shot);ketchupShot.position.set(p.x,p.y,p.z);}
- for(const p of state.splats){let o=puddles.get(p.id);if(!o){o=ball(scene,red,p.x,.025,p.z,1.3,.035,1.1);o.castShadow=o.receiveShadow=false;puddles.set(p.id,o);}o.scale.y=Math.max(.004,p.life/3*.035);}
- for(const [id,o] of puddles)if(!state.splats.some(p=>p.id===id)){o.removeFromParent();puddles.delete(id);}
+ if(m.shot){ketchupShot.material.color.set(m.shot.color);targetCircle.material.color.set(m.shot.color);targetRing.position.set(m.shot.target.x,0,m.shot.target.z);targetCircle.scale.setScalar(.9+Math.sin(t*12)*.1);const p=shotPosition(m.shot);ketchupShot.position.set(p.x,p.y,p.z);}
+ for(const p of state.splats){let o=puddles.get(p.id);if(!o){o=ball(scene,mat(p.color,{roughness:.3}),p.x,.025,p.z,1.3,.035,1.1);o.castShadow=o.receiveShadow=false;puddles.set(p.id,o);}o.scale.y=Math.max(.004,p.life/3*.035);}
+ for(const [id,o] of puddles)if(!state.splats.some(p=>p.id===id)){o.removeFromParent();o.material.dispose();puddles.delete(id);}
+ apronSplat.material.color.set(state.stainColor);$('#splat-overlay').style.setProperty('--splat-color',state.stainColor);
  $('#splat-overlay').style.opacity=String(Math.min(.24,state.stain*.12));
  spiceObjects.forEach(({g,halo,tag},i)=>{const found=state.found.includes(i);g.position.y=reduced?0:Math.sin(t*2+i)*.12;g.rotation.y=Math.sin(t*.5+i)*.3;g.scale.setScalar(found?.6:1);halo.visible=!found;tag.visible=!found&&dist(state,SPICES[i])<15;});
  pickle.scale.y=1+(reduced?0:Math.sin(t*2)*.06);shakerHead.rotation.z=reduced?0:state.showerCooldown>0?Math.sin(t*15)*.2:0;
- hintDots.forEach((o,i)=>{o.visible=state.hints&&!!state.race&&i>=state.race.checkpoint;o.position.y=.3+(reduced?0:Math.sin(t*3-i)*.12);});
+ hintDots.forEach((o,i)=>{o.visible=state.hints&&!!state.race;o.position.y=.3+(reduced?0:Math.sin(t*3-i)*.12);});
  orbitTrack.visible=recovery;flickHand.visible=state.mode==='flick'&&state.ride.time<1;
  if(flickHand.visible){const start=state.ride.start;flickHand.position.set(start.x-2,start.y+1.2,start.z);flickHand.rotation.z=-1+state.ride.time*2.8;}
  trophy.rotation.y=reduced?0:Math.sin(t*.7)*.1;
@@ -240,11 +244,11 @@ function animate(){
  if((uiTime+=dt)>.1){uiTime=0;refreshHud();}renderer.render(scene,camera);
 }
 addEventListener('resize',()=>{renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,1.6));camera.aspect=innerWidth/innerHeight;camera.fov=innerWidth<700?57:45;camera.updateProjectionMatrix();});
-const readState=()=>({player:{x:state.x,y:state.y,z:state.z},mode:state.mode,time:state.time,mixer:state.mixer,apronColor:state.apronColor,carriedSauce:state.carriedSauce,sauceShot:state.sauceShot,sauceAim:sauceAim(state),sauceHits:state.sauceHits,nearby:nearby(state),race:state.race,orbit:state.orbit,ride:state.ride,monster:state.monster,spices:state.found,badges:state.badges,squirts:state.squirts,wins:state.wins,losses:state.losses,paused:paused(),landmarks:{start:START,finish:FINISH,shower:SHOWER,pickle:BOUNCE,sauceLab:MIXER,spices:SPICES},maze:{walls:WALLS,route:state.hints?ROUTE:undefined}});
+const readState=()=>({player:{x:state.x,y:state.y,z:state.z},mode:state.mode,time:state.time,mixer:state.mixer,stainColor:state.stainColor,splats:state.splats,apronColor:state.apronColor,carriedSauce:state.carriedSauce,sauceShot:state.sauceShot,sauceAim:sauceAim(state),sauceHits:state.sauceHits,nearby:nearby(state),race:state.race,orbit:state.orbit,ride:state.ride,monster:state.monster,spices:state.found,badges:state.badges,squirts:state.squirts,wins:state.wins,losses:state.losses,paused:paused(),landmarks:{start:START,finish:FINISH,shower:SHOWER,pickle:BOUNCE,sauceLab:MIXER,spices:SPICES},maze:{walls:WALLS,route:state.hints?ROUTE:undefined}});
 if(document.modelContext?.registerTool){
  const lifecycle=new AbortController(),register=t=>{try{Promise.resolve(document.modelContext.registerTool(t,{signal:lifecycle.signal})).catch(()=>{});}catch{}};
  register({name:'read_spice_world',description:'Read Spice World, the explorer, Squeeze, maze race, spice friends, sauce lab recipes and two-lap flight. Maze route is visible only after enabling the normal mustard trail.',inputSchema:{type:'object',properties:{},additionalProperties:false},annotations:{readOnlyHint:true},execute:readState});
- register({name:'walk_spice_world',description:'Use ordinary walking controls along world axes for 0.1 to 3 seconds. In flight, negative z advances the orbit and positive z reverses. No teleporting or skipping race checkpoints.',inputSchema:{type:'object',properties:{x:{type:'number',minimum:-1,maximum:1},z:{type:'number',minimum:-1,maximum:1},seconds:{type:'number',minimum:.1,maximum:3},jump:{type:'boolean'}},required:['x','z','seconds'],additionalProperties:false},annotations:{readOnlyHint:false},async execute(a){if(paused()||![a.x,a.z,a.seconds].every(Number.isFinite)||Math.abs(a.x)>1||Math.abs(a.z)>1||a.seconds<.1||a.seconds>3)throw new Error('Close menus and use valid movement controls.');if(a.jump)jump(state);toolInput={x:a.x,z:a.z};try{await new Promise(r=>setTimeout(r,a.seconds*1000));}finally{toolInput=null;}return readState();}});
+ register({name:'walk_spice_world',description:'Use ordinary walking controls along world axes for 0.1 to 3 seconds. In flight, negative z advances the orbit and positive z reverses. Movement respects walls. Any route to the finish is allowed.',inputSchema:{type:'object',properties:{x:{type:'number',minimum:-1,maximum:1},z:{type:'number',minimum:-1,maximum:1},seconds:{type:'number',minimum:.1,maximum:3},jump:{type:'boolean'}},required:['x','z','seconds'],additionalProperties:false},annotations:{readOnlyHint:false},async execute(a){if(paused()||![a.x,a.z,a.seconds].every(Number.isFinite)||Math.abs(a.x)>1||Math.abs(a.z)>1||a.seconds<.1||a.seconds>3)throw new Error('Close menus and use valid movement controls.');if(a.jump)jump(state);toolInput={x:a.x,z:a.z};try{await new Promise(r=>setTimeout(r,a.seconds*1000));}finally{toolInput=null;}return readState();}});
  addEventListener('pagehide',()=>lifecycle.abort(),{once:true});
 }
 refreshHud();animate();$('#loading').style.opacity='0';setTimeout(()=>$('#loading').remove(),600);
