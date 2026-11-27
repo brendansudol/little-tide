@@ -1,5 +1,5 @@
 import * as THREE from '../vendor/three.module.js';
-import {TAU,MAZE,START,FINISH,SPAWN,SHOWER,BOUNCE,MIXER,SAUCES,RACE_HEAD_START,RACE_FINISH_TIME,FINISH_HALF_WIDTH,SPICES,WALLS,ROUTE,ROUTE_LENGTH,createState,nearby,act,addSauce,clearRecipe,stirSauces,rideMixer,closeMixer,sauceResult,takeSauce,sauceAim,squirtSauce,sauceShotPosition,jump,home,tick,shotPosition,dist,clamp} from './rules.js?v=sauce-4';
+import {TAU,MAZE,START,FINISH,SPAWN,SHOWER,BOUNCE,MIXER,SAUCES,RACE_HEAD_START,RACE_FINISH_TIME,MAX_MINIS,FINISH_HALF_WIDTH,SPICES,WALLS,ROUTE,ROUTE_LENGTH,createState,nearby,act,addSauce,clearRecipe,stirSauces,rideMixer,closeMixer,sauceResult,takeSauce,sauceAim,squirtSauce,sauceShotPosition,jump,home,tick,shotPosition,dist,clamp} from './rules.js?v=sauce-5';
 const $=s=>document.querySelector(s),canvas=$('#world'),reduced=matchMedia('(prefers-reduced-motion: reduce)').matches;
 let renderer;
 try{renderer=new THREE.WebGLRenderer({canvas,antialias:true});}catch(error){$('#loading').innerHTML='<p>Spice World needs WebGL.<br>Please enable hardware acceleration and try again.</p>';throw error;}
@@ -53,14 +53,16 @@ WALLS.forEach((b,i)=>{
 function shaker(x,z,color,name){const g=group(x,0,z);cylinder(g,cream,0,1.9,0,1.15,3.8);cylinder(g,mat(color),0,3.9,0,1.25,.5);for(let i=0;i<5;i++)ball(g,dark,Math.cos(i*TAU/5)*.55,4.17,Math.sin(i*TAU/5)*.55,.085,.02,.085);for(const sx of [-.35,.35])ball(g,dark,sx,2.1,1.05,.12);const text=label(name,3.4);text.position.set(0,1,1.3);g.add(text);return g;}
 shaker(-24,-18,'#6d6455','PEPPER');shaker(24,-17,'#ece5d5','SALT');shaker(25,-5,'#d39548','CINNAMON');
 for(let i=0;i<11;i++){const g=group(Math.cos(i*2)*85,2+rand()*14,Math.sin(i*2)*85);for(let j=-1;j<=1;j++)ball(g,cream,j*3,0,0,4,1.6,2.7);}
-function arch(p,text,color){const g=group(p.x,0,p.z);box(g,cream,-3,2.4,0,.32,4.8,.32);box(g,cream,3,2.4,0,.32,4.8,.32);box(g,color,0,4.65,0,6.6,.8,.55);for(let i=0;i<10;i++)box(g,i%2?dark:cream,-2.8+i*.62,4.65,.29,.6,.65,.04);const s=label(text,6);s.position.y=5.7;g.add(s);return g;}
-arch(START,'RACE SQUEEZE',red);arch(FINISH,'THE GOLDEN FINISH',mustard);
-for(let i=0;i<12;i++)box(scene,i%2?dark:cream,FINISH.x-FINISH_HALF_WIDTH+(i+.5)*.5,.035,FINISH.z,.5,.05,.7);
+function arch(p,text,color){const g=group(p.x,0,p.z);box(g,cream,-3,2.4,0,.32,4.8,.32);box(g,cream,3,2.4,0,.32,4.8,.32);box(g,color,0,4.65,0,6.6,.8,.55);for(let i=0;i<10;i++)box(g,i%2?dark:cream,-2.8+i*.62,4.65,.29,.6,.65,.04);const s=label(text,6);s.position.y=5.7;g.add(s);return{g,tag:s};}
+const startArch=arch(START,'RACE SQUEEZE',red),finishArch=arch(FINISH,'THE GOLDEN FINISH',mustard);
+const reverseGoal=label('BACKWARDS FINISH!',6.5,'#d9f1c7','#3f6740');reverseGoal.position.y=5.7;startArch.g.add(reverseGoal);reverseGoal.visible=false;
+const reverseStart=label('RACE BACKWARDS HERE',6.5,'#d9f1c7','#3f6740');reverseStart.position.y=7.1;finishArch.g.add(reverseStart);
+for(const p of [START,FINISH])for(let i=0;i<12;i++)box(scene,i%2?dark:cream,p.x-FINISH_HALF_WIDTH+(i+.5)*.5,.035,p.z,.5,.05,.7);
 const startRing=group(START.x,0,START.z);ring(startRing,2.5,.06,'#ffe6a2');
 const finishRing=group(FINISH.x,0,FINISH.z);ring(finishRing,2.5,.06,'#ffe6a2');
 const trophy=group(23,0,-27);cylinder(trophy,bbq,0,.5,0,1.6,1);cylinder(trophy,gold,0,1.3,0,.35,.6);mesh(new THREE.CylinderGeometry(1,.45,1.5,20,1,true),gold,trophy,0,2.3,0);for(const side of [-1,1]){const handle=mesh(new THREE.TorusGeometry(.6,.12,8,24),gold,trophy,side*.9,2.4,0);handle.scale.x=.7;}sign('SQUEEZE CUP',23,4.6,-27,5);
 const spiceObjects=SPICES.map((p,i)=>{
- const g=group(p.x,0,p.z),color=mat(p.color);ball(g,color,0,.8,0,.72,.8,.65);cylinder(g,cream,0,1.6,0,.5,.2);for(let j=0;j<4;j++)ball(g,dark,Math.cos(j*TAU/4)*.25,1.72,Math.sin(j*TAU/4)*.25,.04);
+ const g=group(p.x,0,p.z),color=mat(p.color);ball(g,color,0,.8,0,.65+(i%3)*.07,.8,.65);cylinder(g,cream,0,1.6,0,.5,.2);for(let j=0;j<4;j++)ball(g,dark,Math.cos(j*TAU/4)*.25,1.72,Math.sin(j*TAU/4)*.25,.04);
  for(const x of [-.23,.23]){ball(g,cream,x,1,.55,.18,.22,.08);ball(g,dark,x,1,.63,.075);}
  ball(g,pink,0,.72,.64,.13,.07,.035);for(const side of [-1,1])ball(g,color,side*.8,.7,0,.22,.13,.13);
  const tag=label(p.name.toUpperCase(),3.3);tag.position.y=2.5;g.add(tag);const halo=ring(g,1.1,.08,'#ffe7a5');return{g,halo,tag};
@@ -101,6 +103,15 @@ const monsterArms=[];for(const side of [-1,1]){const arm=group(side*1.3,2.3,0,mo
 const monsterTag=label('SQUEEZE',4.3);monsterTag.position.y=5.4;monster.add(monsterTag);
 const targetRing=group();const targetCircle=ring(targetRing,1.65,.08,'#fff2ce',.09);targetRing.visible=false;const ketchupShot=ball(scene,red.clone(),0,0,0,.4);
 ketchupShot.visible=false;const puddles=new Map();
+// Pocket-sized bottles pop out of a splash, then waddle after the explorer.
+const miniObjects=Array.from({length:MAX_MINIS},()=>{
+ const g=group(),paint=mat('#d83c23',{roughness:.3});
+ ball(g,paint,0,.65,0,.48,.62,.4);cylinder(g,cream,0,1.2,0,.27,.15);mesh(new THREE.ConeGeometry(.2,.48,12),paint,g,0,1.49,0);ball(g,dark,0,1.73,0,.065,.02,.065);
+ for(const x of [-.17,.17]){ball(g,cream,x,.91,.34,.15,.19,.07);ball(g,dark,x,.91,.405,.065,.09,.035);ball(g,cream,x-.02,.96,.43,.025);}
+ ball(g,dark,0,.62,.41,.11,.075,.025);ball(g,pink,0,.59,.43,.07,.025,.015);ball(g,cream,0,.32,.38,.23,.12,.035);
+ const arms=[];for(const side of [-1,1]){const arm=group(side*.45,.66,0,g);ball(arm,paint,side*.13,0,0,.23,.1,.11);ball(arm,cream,side*.28,.03,0,.13);arms.push(arm);ball(g,cream,side*.25,.06,.1,.19,.09,.25);}
+ const tag=label('MINI SQUEEZE',2.4,'#fff1cf','#a64637');tag.position.y=2.1;g.add(tag);g.visible=false;return{g,paint,arms,tag};
+});
 // A little chef explorer, ready for a ketchup adventure.
 const player=group(),body=group(0,0,0,player),skin=mat('#e8b88f'),hair=mat('#6c4535');ball(body,green,0,1,0,.38,.58,.3);const apron=box(body,cream.clone(),0,1,.3,.65,.8,.08);ball(body,skin,0,1.84,0,.39,.42,.36);ball(body,hair,0,2.05,-.08,.4,.22,.3);for(const x of [-.13,.13])ball(body,dark,x,1.88,.34,.035);ball(body,pink,0,1.74,.36,.08,.035,.02);
 cylinder(body,cream,0,2.3,0,.4,.3);for(const x of [-.25,0,.25])ball(body,cream,x,2.52,0,.28,.28,.3);
@@ -169,19 +180,22 @@ function drawMap(){
  WALLS.forEach(b=>{const [x,z]=point(b.x-b.w/2,b.z-b.d/2);map.fillRect(x,z,b.w*3.5,b.d*3.5);});
  if(state.hints&&state.race){map.strokeStyle='#ffe4a0';map.lineWidth=2;map.setLineDash([3,4]);map.beginPath();ROUTE.forEach((p,i)=>{const q=point(p.x,p.z);i?map.lineTo(...q):map.moveTo(...q);});map.stroke();map.setLineDash([]);}
  const dot=(p,r,color)=>{map.fillStyle=color;map.beginPath();map.arc(...point(p.x,p.z),r,0,TAU);map.fill();};
- SPICES.forEach((p,i)=>{if(!state.found.includes(i))dot(p,3,'#f3d58d');});dot(MIXER,4,'#bd8deb');dot(FINISH,5,'#fff0a6');dot(state.monster,4,'#ed4932');dot(state,4.5,'#fff7df');
+ SPICES.forEach((p,i)=>{if(!state.found.includes(i))dot(p,3,'#f3d58d');});dot(MIXER,4,'#bd8deb');dot(state.race?.reverse?START:FINISH,5,'#fff0a6');dot(state.monster,4,'#ed4932');dot(state,4.5,'#fff7df');
 }
 function refreshHud(){
  const near=nearby(state),active=state.mode!=='explore',recovery=recovering();
  $('#zone').textContent=state.mode==='mixing'?'A splash of imagination':state.mode==='orbit'?'A french fry with a flight plan':state.mode==='race'?'The Great Sauce Race':state.y>3?'A little extra air seasoning':'Welcome to the sauce side';
- $('#spice-count').textContent=`✦ ${state.found.length} / 6 spice friends`;$('#badge-count').textContent=`${Object.values(state.badges).filter(Boolean).length} / 3 prizes`;
+ $('#spice-count').textContent=`✦ ${state.found.length} / ${SPICES.length} spice friends`;$('#badge-count').textContent=`${Object.values(state.badges).filter(Boolean).length} / 3 prizes`;
  for(const [id,earned] of Object.entries(state.badges)){$('#badge-'+id).classList.toggle('found',earned);$('#badge-'+id+' .check').textContent=earned?'✓':'○';}
- const button=$('#interact');button.classList.toggle('ready',!!near);button.disabled=!near||state.mode==='mixing'&&(state.mixer.phase==='stirring'||state.mixer.ride||state.mixer.recipe.length<2);button.querySelector('strong').textContent=near?.name||'Meet the spice club';button.querySelector('small').textContent=near?.kind==='mixer'?'Six sauces. Your own colorful recipe.':near?.kind==='race'?'A maze, a rival, and one saucy trophy':near?.kind==='orbit'?'Two complete laps unlock your landing':near?.kind==='hint'?'A little help finding the golden exit':'Six little friends are in the maze';
+ const button=$('#interact');button.classList.toggle('ready',!!near);button.disabled=!near||state.mode==='mixing'&&(state.mixer.phase==='stirring'||state.mixer.ride||state.mixer.recipe.length<2);button.querySelector('strong').textContent=near?.name||'Meet the spice club';button.querySelector('small').textContent=near?.kind==='mixer'?'Six sauces. Your own colorful recipe.':near?.kind==='race'?(near.reverse?'Golden arch to original start. Any route!':'Start to golden finish. Any route!'):near?.kind==='orbit'?'Two complete laps unlock your landing':near?.kind==='hint'?'A little help finding the golden exit':'Twelve little friends are in the maze';
  document.body.classList.toggle('active',active);document.body.classList.toggle('recovering',recovery);$('#home').disabled=recovery;$('#race-panel').hidden=!active||state.mode==='mixing';$('#leave-race').hidden=!['race','countdown'].includes(state.mode);
  $('#jump').disabled=['flick','return','countdown'].includes(state.mode);$('#jump').textContent=state.mode==='orbit'?(state.orbit.cruise?'Ⅱ':'↻'):'↑';$('#jump').setAttribute('aria-label',state.mode==='orbit'?(state.orbit.cruise?'Pause flying':'Fly around the world'):'Jump');
- let title='',detail='',progress=0,eyebrow='THE GREAT SAUCE RACE';
- if(state.mode==='countdown'){title=`Ready… ${Math.ceil(state.race.countdown)}`;detail='Any route counts—even around the maze. Cross the finish stripe!';progress=(3-state.race.countdown)/3;}
- if(state.mode==='race'){title=`${Math.max(0,Math.ceil(RACE_FINISH_TIME-state.race.elapsed))}s to beat Squeeze`;detail=state.race.elapsed<RACE_HEAD_START?'One-second head start. RUN!' :'Through or around: cross the finish stripe first!';progress=state.race.monsterDistance/ROUTE_LENGTH;}
+ let title='',detail='',progress=0,eyebrow=state.race?.reverse?'THE BACKWARDS SAUCE RACE':'THE GREAT SAUCE RACE';
+ const backwards=!!state.race?.reverse;startArch.tag.visible=!backwards;reverseGoal.visible=backwards;finishArch.tag.visible=!backwards;
+ $('#mini-note').textContent=state.minis.length?`${state.minis.length} Mini ${state.minis.length===1?'Squeeze':'Squeezes'} in your sauce crew!`:'Race from either arch. Golden arch = backwards race!';
+ $('#map').setAttribute('aria-label',`Sauce maze map: cream is you, red is Squeeze, gold is ${backwards?'the original start—your backwards finish':'the finish'}. Mustard dots show an optional race hint.`);
+ if(state.mode==='countdown'){title=`Ready… ${Math.ceil(state.race.countdown)}`;detail=backwards?'Race back to the original start stripe. Any route counts!':'Any route counts—even around the maze. Cross the finish stripe!';progress=(3-state.race.countdown)/3;}
+ if(state.mode==='race'){title=`${Math.max(0,Math.ceil(RACE_FINISH_TIME-state.race.elapsed))}s to beat Squeeze`;detail=state.race.elapsed<RACE_HEAD_START?'One-second head start. RUN!' :backwards?'Back to the original start! Through or around.':'Through or around: cross the finish stripe first!';progress=state.race.monsterDistance/ROUTE_LENGTH;}
  if(state.mode==='flick'){title='Squeeze wins… FLICK!';detail='A flying french fry is coming to catch you.';progress=state.ride.time/2.3;eyebrow='A VERY SAUCY DETOUR';}
  if(state.mode==='orbit'){const laps=Math.min(2,Math.abs(state.orbit.angle)/TAU);title=`${Math.floor(laps)} / 2 laps · ${Math.floor((laps%1)*100)}%`;detail=state.orbit.cruise?'Flying! Two full laps and you land back home.':'Tap Fly, or hold W / ↑ / the joystick to circle the world.';progress=laps/2;eyebrow='THE FRENCH-FRY FLIGHT CLUB';}
  if(state.mode==='return'){title='Two laps! Home sweet sauce.';detail='Coming in for a soft landing. Your prizes are safe.';progress=1;eyebrow='A LITTLE COMEBACK';}
@@ -222,6 +236,7 @@ function animate(){
  if(state.carriedSauce)bottlePaint.color.set(state.carriedSauce.color);
  sauceDrops.forEach((o,i)=>{const shot=state.sauceShot;o.visible=!!shot&&shot.age>i*.025;if(o.visible){const p=sauceShotPosition(shot,i*.025);o.position.set(p.x,p.y,p.z);o.material.color.set(shot.color);o.scale.setScalar(.18-i*.012);}});
  monsterPaint.color.set(state.monster.color);
+ miniObjects.forEach(({g,paint,arms,tag},i)=>{const mini=state.minis[i];g.visible=!!mini;if(!mini)return;paint.color.set(mini.color);g.position.set(mini.x,mini.y+(reduced||mini.age<1.1?0:Math.abs(Math.sin(t*6+mini.id))*.13),mini.z);g.rotation.set(0,mini.yaw,reduced?0:Math.sin(t*5+mini.id)*.07);g.scale.setScalar(reduced?1:Math.min(1,.3+mini.age*2));arms.forEach((a,j)=>a.rotation.z=reduced?0:Math.sin(t*5+mini.id+j)*.4);tag.visible=mini.age<3||dist(state,mini)<5;});
  player.position.set(state.x,state.y,state.z);player.rotation.set(0,mix.ride&&reduced?Math.PI:state.yaw,mix.ride&&!reduced?Math.sin(mix.ride.time*9)*.2:state.mode==='flick'&&!reduced?Math.sin(state.ride.time*5)*.6:0);player.scale.setScalar(recovery?2:1);fry.visible=recovery;flightTag.visible=recovery;apronSplat.visible=state.stain>0;crown.visible=state.badges.spices;
  const moving=!isPaused&&!recovery&&state.mode!=='countdown'&&!mixing&&Math.hypot(input.x,input.z)>.1;if(moving)walkPhase+=dt*11;limbs.forEach((l,i)=>l.rotation.x=moving?Math.sin(walkPhase+(i<2?0:Math.PI))*.5:0);if(mix.ride)limbs.forEach((l,i)=>{l.rotation.x=i%2?-1.8:Math.sin(t*6+i)*.3;});if(recovery)limbs.forEach((l,i)=>{l.rotation.x=i%2?-.7:0;});
  const m=state.monster;monster.position.set(m.x,reduced?0:m.painted>0?Math.abs(Math.sin(m.painted*9))*.6:Math.sin(t*3)*.07,m.z);monster.rotation.y=m.yaw;monsterBody.scale.set(1,m.shot?1+Math.sin(m.shot.age*12)*.05:1,1);monsterArms.forEach((a,i)=>a.rotation.z=state.mode==='flick'?(i?-.9:1.5):reduced?0:Math.sin(t*(state.mode==='race'?6:2)+i)*.16);
@@ -244,10 +259,10 @@ function animate(){
  if((uiTime+=dt)>.1){uiTime=0;refreshHud();}renderer.render(scene,camera);
 }
 addEventListener('resize',()=>{renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,1.6));camera.aspect=innerWidth/innerHeight;camera.fov=innerWidth<700?57:45;camera.updateProjectionMatrix();});
-const readState=()=>({player:{x:state.x,y:state.y,z:state.z},mode:state.mode,time:state.time,mixer:state.mixer,stainColor:state.stainColor,splats:state.splats,apronColor:state.apronColor,carriedSauce:state.carriedSauce,sauceShot:state.sauceShot,sauceAim:sauceAim(state),sauceHits:state.sauceHits,nearby:nearby(state),race:state.race,orbit:state.orbit,ride:state.ride,monster:state.monster,spices:state.found,badges:state.badges,squirts:state.squirts,wins:state.wins,losses:state.losses,paused:paused(),landmarks:{start:START,finish:FINISH,shower:SHOWER,pickle:BOUNCE,sauceLab:MIXER,spices:SPICES},maze:{walls:WALLS,route:state.hints?ROUTE:undefined}});
+const readState=()=>({player:{x:state.x,y:state.y,z:state.z},mode:state.mode,time:state.time,mixer:state.mixer,stainColor:state.stainColor,splats:state.splats,apronColor:state.apronColor,carriedSauce:state.carriedSauce,sauceShot:state.sauceShot,sauceAim:sauceAim(state),sauceHits:state.sauceHits,nearby:nearby(state),race:state.race,orbit:state.orbit,ride:state.ride,monster:state.monster,minis:state.minis,miniSerial:state.miniSerial,spiceTotal:SPICES.length,spices:state.found,badges:state.badges,squirts:state.squirts,wins:state.wins,losses:state.losses,paused:paused(),landmarks:{start:START,finish:FINISH,shower:SHOWER,pickle:BOUNCE,sauceLab:MIXER,spices:SPICES},maze:{walls:WALLS,route:state.hints?(state.race?.reverse?[...ROUTE].reverse():ROUTE):undefined}});
 if(document.modelContext?.registerTool){
  const lifecycle=new AbortController(),register=t=>{try{Promise.resolve(document.modelContext.registerTool(t,{signal:lifecycle.signal})).catch(()=>{});}catch{}};
- register({name:'read_spice_world',description:'Read Spice World, the explorer, Squeeze, maze race, spice friends, sauce lab recipes and two-lap flight. Maze route is visible only after enabling the normal mustard trail.',inputSchema:{type:'object',properties:{},additionalProperties:false},annotations:{readOnlyHint:true},execute:readState});
+ register({name:'read_spice_world',description:'Read Spice World, the explorer, Squeeze and Mini Squeezes, forward or backwards maze race, twelve spice friends, sauce lab recipes and two-lap flight. Maze route is visible only after enabling the normal mustard trail.',inputSchema:{type:'object',properties:{},additionalProperties:false},annotations:{readOnlyHint:true},execute:readState});
  register({name:'walk_spice_world',description:'Use ordinary walking controls along world axes for 0.1 to 3 seconds. In flight, negative z advances the orbit and positive z reverses. Movement respects walls. Any route to the finish is allowed.',inputSchema:{type:'object',properties:{x:{type:'number',minimum:-1,maximum:1},z:{type:'number',minimum:-1,maximum:1},seconds:{type:'number',minimum:.1,maximum:3},jump:{type:'boolean'}},required:['x','z','seconds'],additionalProperties:false},annotations:{readOnlyHint:false},async execute(a){if(paused()||![a.x,a.z,a.seconds].every(Number.isFinite)||Math.abs(a.x)>1||Math.abs(a.z)>1||a.seconds<.1||a.seconds>3)throw new Error('Close menus and use valid movement controls.');if(a.jump)jump(state);toolInput={x:a.x,z:a.z};try{await new Promise(r=>setTimeout(r,a.seconds*1000));}finally{toolInput=null;}return readState();}});
  addEventListener('pagehide',()=>lifecycle.abort(),{once:true});
 }

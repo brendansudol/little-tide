@@ -1,6 +1,6 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
-import {TAU,START,FINISH,SPAWN,SHOWER,BOUNCE,MIXER,SAUCES,RACE_SPEED,RACE_HEAD_START,RACE_FINISH_TIME,FINISH_LINE_Z,SPICES,WALLS,LINKS,ROUTE,ROUTE_CELLS,ROUTE_LENGTH,cellPoint,cellRoute,createState,nearby,act,addSauce,clearRecipe,stirSauces,rideMixer,mixerRidePose,closeMixer,sauceResult,takeSauce,sauceAim,squirtSauce,sauceShotPosition,jump,home,tick,move,dist,clearSight,routePose,recoveryPose,shotPosition} from '../dist/spice/rules.js';
+import {TAU,START,FINISH,SPAWN,SHOWER,BOUNCE,MIXER,SAUCES,MAX_MINIS,RACE_SPEED,RACE_HEAD_START,RACE_FINISH_TIME,FINISH_LINE_Z,SPICES,WALLS,LINKS,ROUTE,ROUTE_CELLS,ROUTE_LENGTH,cellPoint,cellRoute,createState,nearby,act,addSauce,clearRecipe,stirSauces,rideMixer,mixerRidePose,closeMixer,sauceResult,takeSauce,sauceAim,squirtSauce,sauceShotPosition,jump,home,tick,move,dist,clearSight,routePose,recoveryPose,shotPosition} from '../dist/spice/rules.js';
 const step=(s,seconds,input={x:0,z:0},fps=60)=>{for(let i=0;i<Math.ceil(seconds*fps);i++)tick(s,1/fps,input);};
 const place=(s,p)=>Object.assign(s,{x:p.x,z:p.z,y:0,vy:0});
 const close=(a,b)=>assert.ok(dist(a,b)<.001,`${JSON.stringify(a)} / ${JSON.stringify(b)}`);
@@ -10,8 +10,8 @@ function followRoute(s,fps=60){
   let frames=0;while(dist(s,p)>.04&&s.mode==='race'&&frames++<fps*8){const dx=p.x-s.x,dz=p.z-s.z,d=dist(s,p),a=Math.min(1,d/(7.2/fps));tick(s,1/fps,{x:dx/d*a,z:dz/d*a});}
  }
 }
-test('The barbecue maze is connected, all six spices are reachable, and every graph edge matches its walls',()=>{
- assert.equal(LINKS.length,30);assert.equal(LINKS.reduce((n,a)=>n+a.length,0),58);assert.equal(new Set(SPICES.map(p=>p.id)).size,6);
+test('The barbecue maze is connected, all twelve spices are reachable, and every graph edge matches its walls',()=>{
+ assert.equal(LINKS.length,30);assert.equal(LINKS.reduce((n,a)=>n+a.length,0),58);assert.equal(new Set(SPICES.map(p=>p.id)).size,12);
  for(let id=0;id<30;id++){assert.ok(cellRoute(24,id).length);for(const n of LINKS[id]){assert.ok(LINKS[n].includes(id));assert.ok(clearSight(cellPoint(id),cellPoint(n)));}}
  assert.equal(ROUTE_CELLS[0],24);assert.equal(ROUTE_CELLS.at(-1),5);assert.ok(clearSight(START,cellPoint(24)));assert.ok(clearSight(cellPoint(5),FINISH));
 });
@@ -51,8 +51,8 @@ test('Flick and return arcs meet their endpoints and the monster follows every r
  const s=createState();s.mode='flick';s.ride={time:0,start:{x:2,y:0,z:3}};close(recoveryPose(s),s.ride.start);s.ride.time=2.3;close(recoveryPose(s),{x:50,z:0});assert.ok(Math.abs(recoveryPose(s).y-5)<.001);s.mode='return';s.ride={time:2.4,start:{x:50,y:5,z:0}};close(recoveryPose(s),SPAWN);assert.ok(Math.abs(recoveryPose(s).y)<.001);
  close(routePose(0),START);close(routePose(ROUTE_LENGTH),FINISH);let distance=0;for(let i=1;i<ROUTE.length;i++){distance+=dist(ROUTE[i-1],ROUTE[i]);close(routePose(distance),ROUTE[i]);}
 });
-test('Six spice friends award one crown, pickle jumps land safely, and Home preserves prizes',()=>{
- const s=createState();s.shield=1000;for(const p of SPICES){place(s,p);step(s,.1);step(s,.1);}assert.equal(s.found.length,6);assert.ok(s.badges.spices);place(s,BOUNCE);step(s,.1);assert.equal(s.bounces,1);step(s,.5,{x:1,z:0});assert.ok(s.y>4);step(s,2);assert.equal(s.y,0);assert.equal(s.bounces,1);home(s);assert.equal(s.found.length,6);assert.ok(s.badges.spices);
+test('Twelve spice friends award one crown, pickle jumps land safely, and Home preserves prizes',()=>{
+ const s=createState();s.shield=1000;for(const p of SPICES){place(s,p);step(s,.1);step(s,.1);}assert.equal(s.found.length,12);assert.ok(s.badges.spices);place(s,BOUNCE);step(s,.1);assert.equal(s.bounces,1);step(s,.5,{x:1,z:0});assert.ok(s.y>4);step(s,2);assert.equal(s.y,0);assert.equal(s.bounces,1);home(s);assert.equal(s.found.length,12);assert.ok(s.badges.spices);
  const racing=startRace();home(racing);assert.equal(racing.mode,'explore');assert.equal(racing.race,null);assert.equal(racing.wins,0);
 });
 
@@ -135,4 +135,34 @@ test('Painted Squeeze squirts the mixed color back, including the projectile, pu
  for(const fps of [30,60,120]){const s=bottledSauce();place(s,{x:5,z:19});Object.assign(s.monster,{x:5,z:15,cooldown:0});s.shield=0;assert.ok(squirtSauce(s));step(s,.5,undefined,fps);assert.equal(s.monster.sauceName,'Purple Cloud');s.monster.cooldown=0;s.monster.shot=null;tick(s,1/fps);const shot=s.monster.shot;assert.ok(shot);assert.equal(shot.color,s.carriedSauce.color);assert.equal(shot.name,'Purple Cloud');step(s,1.4,undefined,fps);assert.ok(s.splats.some(p=>p.color===s.carriedSauce.color));assert.equal(s.stainColor,s.carriedSauce.color);assert.equal(s.squirts,1);
   s.carriedSauce=sauceResult(['ketchup','mustard']);s.bump={x:0,z:0};s.sauceCooldown=0;place(s,{x:s.monster.x+1,z:s.monster.z+2});assert.ok(squirtSauce(s));step(s,.5,undefined,fps);s.shield=0;s.monster.cooldown=0;tick(s,1/fps);assert.equal(s.monster.shot.color,s.carriedSauce.color);assert.equal(s.monster.shot.name,'Lava sauce');
  }
+});
+
+function startBackwards(fps=60){const s=createState();place(s,FINISH);assert.equal(nearby(s).name,'Race backwards!');assert.ok(act(s));assert.equal(s.race.reverse,true);close(s,FINISH);step(s,3.1,undefined,fps);return s;}
+test('Backwards races start at the golden arch and are winnable through the actual maze',()=>{
+ for(const fps of [30,60,120]){const s=startBackwards(fps);assert.equal(s.mode,'race');assert.equal(s.race.monsterDistance,0);close(s.monster,FINISH);tick(s,1/fps);assert.equal(s.wins,0,'The departure stripe must not count');walkPath(s,[...ROUTE].reverse().slice(1),fps);assert.equal(s.wins,1);assert.equal(s.losses,0);assert.ok(s.badges.race);assert.match(s.event,/BACKWARDS VICTORY/);step(s,20,undefined,fps);assert.equal(s.losses,0);assert.equal(s.monster.returnDistance,0);}
+});
+test('Backwards races accept either outside route and either edge of the original start stripe',()=>{
+ for(const fps of [30,60,120])for(const side of [-1,1]){const s=startBackwards(fps);const x=side*20;walkPath(s,[{x,z:-27},{x,z:11},{x:START.x,z:11}],fps);assert.equal(s.wins,1);assert.equal(s.losses,0);}
+ for(const side of [-1,1]){const s=startBackwards();place(s,{x:START.x+side*2.8,z:START.z-1});jump(s);walkPath(s,[{x:s.x,z:START.z}]);assert.equal(s.wins,1);}
+});
+test('Backwards close finishes, losses, cancellation and return keep Squeeze on his route',()=>{
+ for(const fps of [30,60,120])for(const margin of [-.003,0,.003]){const s=startBackwards(fps);place(s,{x:START.x,z:START.z-.4});s.race.elapsed=RACE_FINISH_TIME-.05/7.2+margin;tick(s,1/fps,{x:0,z:1});assert.equal(s.wins,margin<=0?1:0);assert.equal(s.losses,margin<=0?0:1);}
+ close(routePose(0,true),FINISH);close(routePose(ROUTE_LENGTH,true),START);
+ const s=startBackwards();step(s,3);const before={x:s.monster.x,z:s.monster.z};home(s);tick(s,.02);assert.ok(dist(s.monster,before)<.13,'Cancel should walk home without teleporting');step(s,20);assert.equal(s.monster.returnDistance,0);
+ const lost=startBackwards();step(lost,RACE_FINISH_TIME);assert.equal(lost.losses,1);assert.ok(dist(lost.monster,START)<.4);const atLoss={x:lost.monster.x,z:lost.monster.z};step(lost,2.4);act(lost);for(let i=0;i<1200&&lost.mode!=='explore';i++)tick(lost,1/60);assert.equal(lost.mode,'explore');assert.ok(dist(lost.monster,atLoss)<2,'Recovery must not jump Squeeze to the opposite end');
+});
+test('All twelve spices must be collected for the crown, with no duplicate rewards',()=>{
+ const s=createState();s.shield=1000;for(const p of SPICES.slice(0,6)){place(s,p);tick(s,.02);}assert.equal(s.found.length,6);assert.equal(s.badges.spices,false);
+ for(const p of SPICES.slice(6)){assert.ok(cellRoute(24,p.id).length);place(s,p);tick(s,.02);}assert.equal(s.found.length,12);assert.ok(s.badges.spices);assert.equal(s.effect,'badge');tick(s,.02);assert.equal(s.effect,null);assert.equal(s.found.length,12);home(s);assert.equal(s.found.length,12);
+});
+function hitWithSauce(s,color='#d83c23'){s.shield=0;s.monster.shot={age:1.34,from:{x:s.x-2,z:s.z},target:{x:s.x,z:s.z},color,name:'Test sauce'};s.monster.cooldown=4;tick(s,.02);}
+test('Each direct sauce hit pops out one matching Mini Squeeze; misses and dodges create none',()=>{
+ for(const fps of [30,60,120]){const s=createState();place(s,{x:5,z:19});s.shield=0;s.monster.cooldown=0;step(s,1.5,undefined,fps);assert.equal(s.minis.length,1);assert.equal(s.miniSerial,1);assert.equal(s.minis[0].color,'#d83c23');assert.ok(s.minis[0].y>0);s.shield=100;step(s,2,undefined,fps);assert.equal(s.minis.length,1);assert.equal(s.minis[0].y,0);const buddy={...s.minis[0]};step(s,1,{x:1,z:0},fps);step(s,2,undefined,fps);assert.ok(dist(buddy,s.minis[0])>1);assert.ok(dist(s.minis[0],s)<5);
+  s.bump={x:0,z:0};hitWithSauce(s,'#b883f5');assert.equal(s.minis.length,2);assert.equal(s.minis[0].color,'#d83c23');assert.equal(s.minis[1].color,'#b883f5');home(s);assert.equal(s.minis.length,2);
+ }
+ for(const dodge of ['walk','jump','shield']){const s=createState();place(s,{x:5,z:19});s.shield=0;s.monster.cooldown=0;tick(s,.01);step(s,.7);if(dodge==='jump')jump(s);if(dodge==='shield')s.shield=10;step(s,.7,dodge==='walk'?{x:1,z:0}:undefined);assert.equal(s.minis.length,0);}
+});
+test('Mini buddies respect maze walls, pause for races and the lab, and stay bounded across many hits',()=>{
+ const s=createState();place(s,{x:-19,z:-20});Object.assign(s.monster,{x:-20,z:-20});for(let i=0;i<MAX_MINIS+5;i++){s.bump={x:0,z:0};hitWithSauce(s);}assert.equal(s.minis.length,MAX_MINIS);assert.equal(s.miniSerial,MAX_MINIS+5);assert.equal(new Set(s.minis.map(m=>m.id)).size,MAX_MINIS);s.shield=100;step(s,3);assert.ok(s.minis.every(m=>m.x<-18.7));
+ const before=JSON.stringify(s.minis);place(s,FINISH);act(s);step(s,3.5);assert.equal(JSON.stringify(s.minis),before);assert.equal(s.squirts,MAX_MINIS+5);home(s);place(s,MIXER);act(s);step(s,5);assert.equal(JSON.stringify(s.minis),before);
 });

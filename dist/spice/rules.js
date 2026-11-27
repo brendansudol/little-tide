@@ -2,7 +2,7 @@ export const TAU = Math.PI * 2;
 export const MAZE = { cols: 6, rows: 5, size: 6, left: -18, top: -23 };
 export const START = { x: -15, z: 11 }, FINISH = { x: 15, z: -27 }, SPAWN = { x: 0, z: 24 };
 export const SHOWER = { x: -24, z: 21 }, BOUNCE = { x: 20, z: 20 }, MIXER = { x: 23, z: 12 };
-export const RACE_SPEED=7, RACE_HEAD_START=1;
+export const RACE_SPEED=7, RACE_HEAD_START=1, MAX_MINIS=8;
 export const FINISH_HALF_WIDTH=3, FINISH_LINE_Z=FINISH.z+.35, SAUCE_RANGE=14;
 export const SAUCES=[
  {id:'ketchup',name:'Ketchup',color:'#f54c53'},
@@ -46,9 +46,10 @@ for(let id=0;id<30;id++){
  if(x===5||!LINKS[id].includes(id+1))WALLS.push({x:p.x+3,z:p.z,w:.7,d:6.7});
  if((z===4&&id!==24)||(z<4&&!LINKS[id].includes(id+6)))WALLS.push({x:p.x,z:p.z+3,w:6.7,d:.7});
 }
-const spiceCells=[...new Set([...LINKS.map((a,i)=>a.length===1?i:-1).filter(i=>i>=0&&i!==24&&i!==5),...ROUTE_CELLS.slice(2,-2)])].slice(0,6);
-export const SPICES=spiceCells.map((id,i)=>({id,...cellPoint(id),name:['Paprika','Pepper','Cinnamon','Turmeric','Basil','Ginger'][i],color:['#ef784d','#6e6965','#b5764b','#f1c448','#7ea06c','#e7be89'][i]}));
-export function routePose(distance){
+const spiceCells=[...new Set([...LINKS.map((a,i)=>a.length===1?i:-1).filter(i=>i>=0&&i!==24&&i!==5),...ROUTE_CELLS.slice(2,-2),...Array.from({length:30},(_,i)=>i)])].slice(0,12);
+export const SPICES=spiceCells.map((id,i)=>({id,...cellPoint(id),name:['Paprika','Pepper','Cinnamon','Turmeric','Basil','Ginger','Cumin','Oregano','Chili','Clove','Nutmeg','Cardamom'][i],color:['#ef784d','#6e6965','#b5764b','#f1c448','#7ea06c','#e7be89','#c49a54','#559c80','#ef5654','#915b83','#c28361','#a0bf65'][i]}));
+export function routePose(distance,reverse=false){
+ if(reverse){const p=routePose(ROUTE_LENGTH-distance);return{...p,yaw:p.yaw+Math.PI};}
  let left=clamp(distance,0,ROUTE_LENGTH);
  for(let i=1;i<ROUTE.length;i++){const a=ROUTE[i-1],b=ROUTE[i],length=dist(a,b);if(left<=length)return{x:a.x+(b.x-a.x)*left/length,z:a.z+(b.z-a.z)*left/length,yaw:Math.atan2(b.x-a.x,b.z-a.z)};left-=length;}
  return {...FINISH,yaw:Math.PI};
@@ -56,7 +57,7 @@ export function routePose(distance){
 export function createState(){return{
  ...SPAWN,y:0,vy:0,yaw:Math.PI,time:0,mode:'explore',race:null,ride:null,orbit:null,
  monster:{x:5,z:15,yaw:0,cooldown:3,shot:null,color:'#d83c23',sauceName:'Ketchup',painted:0},splats:[],shotId:0,stain:0,stainColor:'#d83c23',bump:{x:0,z:0},
- found:[],badges:{race:false,spices:false,comeback:false},wins:0,losses:0,bounces:0,squirts:0,
+ minis:[],miniSerial:0,found:[],badges:{race:false,spices:false,comeback:false},wins:0,losses:0,bounces:0,squirts:0,
  bounceCooldown:0,showerCooldown:0,shield:3,hints:false,event:'',effect:null,
  mixer:{recipe:[],phase:'idle',time:0,pour:null,result:null,batches:0,ride:null},apronColor:'#fff1cd',
  carriedSauce:null,sauceShot:null,sauceCooldown:0,sauceHits:0,
@@ -68,7 +69,8 @@ export function nearby(s){
  if(s.mode==='race')return{kind:'hint',name:s.hints?'Hide mustard trail':'Show mustard trail'};
  if(s.mode!=='explore')return null;
  if(dist(s,MIXER)<4.5)return{kind:'mixer',name:'Mix some sauces!'};
- if(dist(s,START)<4)return{kind:'race',name:'Race Squeeze!'};
+ if(dist(s,START)<4)return{kind:'race',name:'Race Squeeze!',reverse:false};
+ if(dist(s,FINISH)<4)return{kind:'race',name:'Race backwards!',reverse:true};
  if(dist(s,SHOWER)<3.5)return{kind:'shower',name:'Seasoning shower!'};
  return null;
 }
@@ -78,8 +80,9 @@ export function act(s){
   s.mode='mixing';s.x=MIXER.x;s.z=MIXER.z+3.8;s.y=0;s.vy=0;s.yaw=Math.PI;s.bump={x:0,z:0};s.monster.shot=null;s.sauceShot=null;s.splats=[];say(s,'Welcome to the Sauce Lab! Add two or more squirts—even the same sauce—then mix!','lab');
  }else if(near.kind==='mix')return stirSauces(s);
  else if(near.kind==='race'){
-  Object.assign(s,{...START,y:0,vy:0,yaw:Math.PI,stain:0,bump:{x:0,z:0},mode:'countdown',race:{elapsed:0,countdown:3,monsterDistance:0},splats:[]});
-  Object.assign(s.monster,{...START,shot:null,yaw:Math.PI});s.sauceShot=null;say(s,'Ready, steady… spaghetti! Pick any route to the golden finish—even around the maze!','start');
+  const reverse=near.reverse,origin=reverse?FINISH:START,yaw=reverse?0:Math.PI;
+  Object.assign(s,{...origin,y:0,vy:0,yaw,stain:0,bump:{x:0,z:0},mode:'countdown',race:{elapsed:0,countdown:3,monsterDistance:0,reverse},splats:[]});
+  Object.assign(s.monster,{...origin,shot:null,yaw,returnDistance:0});s.sauceShot=null;say(s,reverse?'BACKWARDS RACE! From the golden arch to the original start. Any route counts!':'Ready, steady… spaghetti! Pick any route to the golden finish—even around the maze!','start');
  }else if(near.kind==='hint'){s.hints=!s.hints;say(s,s.hints?'Follow the little mustard dots. You can do this!':'Mustard trail tucked away. Trust your spice instincts!');}
  else if(near.kind==='orbit'){s.orbit.cruise=!s.orbit.cruise;say(s,s.orbit.cruise?'French-fry wings, go! Two laps and you’re home.':'Hovering. Tap Fly or use your movement controls to keep going.');}
  else if(near.kind==='shower'){
@@ -91,7 +94,7 @@ export function jump(s){if(s.mode==='mixing')closeMixer(s);if(!['explore','race'
 export function home(s){
  if(['flick','orbit','return'].includes(s.mode)){say(s,'Two laps unlock the way home. Tap Fly to get going!');return false;}
  if(s.mode==='mixing')closeMixer(s);
- if(s.race)s.monster.returnDistance=s.race.monsterDistance;
+ if(s.race)s.monster.returnDistance=s.race.reverse?ROUTE_LENGTH-s.race.monsterDistance:s.race.monsterDistance;
  Object.assign(s,{...SPAWN,y:0,vy:0,yaw:Math.PI,mode:'explore',race:null,ride:null,orbit:null,stain:0,bump:{x:0,z:0},shield:5,splats:[],sauceShot:null});s.monster.shot=null;s.monster.cooldown=4;say(s,'Back at the tasting table. All your discoveries came too.');return true;
 }
 export function move(s,dx,dz){
@@ -115,13 +118,28 @@ function squirt(s,dt){
   if(shot.age>=1.35){
    s.splats.push({...shot.target,id:s.shotId++,life:3,color:shot.color});m.shot=null;
    if(dist(s,shot.target)<1.65&&s.y<1.5&&s.shield===0){
-    const d=Math.max(.1,dist(s,shot.from));s.bump={x:(s.x-shot.from.x)/d*5,z:(s.z-shot.from.z)/d*5};s.stain=3;s.stainColor=shot.color;s.squirts++;s.shield=1;say(s,`PLOP! ${shot.name} on your apron!`,'splat');
+    const d=Math.max(.1,dist(s,shot.from));s.bump={x:(s.x-shot.from.x)/d*5,z:(s.z-shot.from.z)/d*5};s.stain=3;s.stainColor=shot.color;s.squirts++;s.shield=1;spawnMini(s,shot.color);say(s,`PLOP! ${shot.name}… and Mini Squeeze #${s.miniSerial} pops out!`,'splat');
    }else say(s,`Whoosh! ${shot.name} missed you.`,'miss');
   }
  }
 }
+// A splash makes one little buddy. A fixed-size flock keeps long visits light.
+function spawnMini(s,color){
+ const id=++s.miniSerial,a=id*2.4;
+ if(s.minis.length>=MAX_MINIS)s.minis.shift();
+ s.minis.push({id,x:s.x,z:s.z,y:.8,age:0,yaw:s.yaw,color,dx:Math.sin(a),dz:Math.cos(a)});
+}
+function tickMinis(s,dt){
+ if(s.mode!=='explore')return;
+ for(const mini of s.minis){
+  const was=mini.age;mini.age+=dt;
+  if(was<1.1){const part=Math.min(dt,1.1-was),u=clamp(mini.age/1.1,0,1);move(mini,mini.dx*2*part,mini.dz*2*part);mini.y=(1-u)*.8+Math.sin(u*Math.PI)*2.4;}
+  else{mini.y=0;const d=dist(mini,s),space=2.2+(mini.id%3)*.65;if(d>space&&clearSight(mini,s)){const step=Math.min(d-space,3.8*dt);move(mini,(s.x-mini.x)/d*step,(s.z-mini.z)/d*step);}mini.yaw=Math.atan2(s.x-mini.x,s.z-mini.z);}
+ }
+}
 export function shotPosition(shot){const u=clamp((shot.age-.65)/.7,0,1);return{x:shot.from.x+(shot.target.x-shot.from.x)*u,z:shot.from.z+(shot.target.z-shot.from.z)*u,y:2.7*(1-u)+.15*u+Math.sin(u*Math.PI)*1.6};}
 function lose(s){
+ s.monster.returnDistance=s.race.reverse?Math.max(0,ROUTE_LENGTH-s.race.monsterDistance):Math.min(ROUTE_LENGTH,s.race.monsterDistance);
  s.losses++;s.mode='flick';s.ride={time:0,start:{x:s.x,y:s.y,z:s.z}};s.race=null;s.monster.shot=null;s.sauceShot=null;s.splats=[];s.stain=0;
  say(s,'Squeeze wins… FLICK! Fly two laps around Spice World to get back!','flick');
 }
@@ -132,7 +150,7 @@ export function recoveryPose(s){
  return{x:lerp(r.start.x,end.x,e),z:lerp(r.start.z,end.z,e),y:lerp(r.start.y,end.y,e)+Math.sin(u*Math.PI)*15,yaw:Math.PI};
 }
 export function tick(s,dt,input={x:0,z:0}){
- s.event='';s.effect=null;s.time+=dt;
+ s.event='';s.effect=null;s.time+=dt;tickMinis(s,dt);
  for(const key of ['bounceCooldown','showerCooldown','shield','stain'])s[key]=Math.max(0,s[key]-dt);
  s.splats.forEach(p=>p.life-=dt);s.splats=s.splats.filter(p=>p.life>0);
  s.sauceCooldown=Math.max(0,s.sauceCooldown-dt);s.monster.painted=Math.max(0,s.monster.painted-dt);
@@ -143,7 +161,7 @@ export function tick(s,dt,input={x:0,z:0}){
  if(['flick','return'].includes(s.mode)){
   s.ride.time+=dt;Object.assign(s,recoveryPose(s));
   if(s.mode==='flick'&&s.ride.time>=2.3){s.mode='orbit';s.ride=null;s.orbit={angle:0,cruise:false};say(s,'Two laps to come home! Tap Fly, or hold ↑ / W / the joystick.','orbit');}
-  else if(s.mode==='return'&&s.ride.time>=2.4){s.mode='explore';s.ride=null;s.orbit=null;s.badges.comeback=true;s.monster.returnDistance=ROUTE_LENGTH;s.shield=8;s.vy=0;say(s,'TWO LAPS! Welcome back, french-fry flyer!','badge');}
+  else if(s.mode==='return'&&s.ride.time>=2.4){s.mode='explore';s.ride=null;s.orbit=null;s.badges.comeback=true;s.shield=8;s.vy=0;say(s,'TWO LAPS! Welcome back, french-fry flyer!','badge');}
   return;
  }
  if(s.mode==='orbit'){
@@ -161,11 +179,11 @@ export function tick(s,dt,input={x:0,z:0}){
  if(Math.hypot(s.bump.x,s.bump.z)>.03){move(s,s.bump.x*dt,s.bump.z*dt);const decay=Math.exp(-6*dt);s.bump.x*=decay;s.bump.z*=decay;}
  s.y=Math.max(0,s.y+s.vy*dt);s.vy=s.y>0?s.vy-18*dt:0;
  if(s.mode==='explore'&&s.bounceCooldown===0&&dist(s,BOUNCE)<2.6&&s.y<.3){s.vy=16;s.y=.05;s.bounceCooldown=2.2;s.bounces++;say(s,'DILL-IGHTFUL! Pickle trampoline!','bounce');}
- SPICES.forEach((p,i)=>{if(!s.found.includes(i)&&dist(s,p)<1.6&&s.y<2){s.found.push(i);say(s,`${p.name} joins your spice club! ${s.found.length} / 6.`, 'spice');if(s.found.length===6){s.badges.spices=true;say(s,'THE SPICE CLUB IS COMPLETE! A crown for your collection.','badge');}}});
+ SPICES.forEach((p,i)=>{if(!s.found.includes(i)&&dist(s,p)<1.6&&s.y<2){s.found.push(i);say(s,`${p.name} joins your spice club! ${s.found.length} / ${SPICES.length}.`, 'spice');if(s.found.length===SPICES.length){s.badges.spices=true;say(s,'THE SPICE CLUB IS COMPLETE! A crown for your collection.','badge');}}});
  if(s.mode==='race'){
-  const r=s.race,finishFraction=finishEntry(before,s),arrival=r.elapsed+finishFraction*dt;r.elapsed+=dt;
-  if(Number.isFinite(finishFraction)&&arrival<=RACE_FINISH_TIME+1e-9){s.monster.returnDistance=Math.max(0,arrival-RACE_HEAD_START)*RACE_SPEED;s.mode='explore';s.race=null;s.wins++;s.badges.race=true;s.shield=8;s.sauceShot=null;say(s,'YOU BEAT SQUEEZE! The Golden Squeeze Cup is yours!','win');return;}
-  r.monsterDistance=Math.max(0,r.elapsed-RACE_HEAD_START)*RACE_SPEED;Object.assign(s.monster,routePose(r.monsterDistance));
+  const r=s.race,finishFraction=finishEntry(before,s,r.reverse?START:FINISH),arrival=r.elapsed+finishFraction*dt;r.elapsed+=dt;
+  if(Number.isFinite(finishFraction)&&arrival<=RACE_FINISH_TIME+1e-9){const traveled=Math.max(0,arrival-RACE_HEAD_START)*RACE_SPEED;s.monster.returnDistance=r.reverse?ROUTE_LENGTH-traveled:traveled;s.mode='explore';s.race=null;s.wins++;s.badges.race=true;s.shield=8;s.sauceShot=null;say(s,r.reverse?'BACKWARDS VICTORY! You beat Squeeze to the original start!':'YOU BEAT SQUEEZE! The Golden Squeeze Cup is yours!','win');return;}
+  r.monsterDistance=Math.max(0,r.elapsed-RACE_HEAD_START)*RACE_SPEED;Object.assign(s.monster,routePose(r.monsterDistance,r.reverse));
   if(r.elapsed>=RACE_FINISH_TIME)lose(s);else tickSauceShot(s,dt);return;
  }
  const m=s.monster;
@@ -178,10 +196,10 @@ export function tick(s,dt,input={x:0,z:0}){
 
 // Any route is fair. Detect entry into the visible stripe from any direction,
 // including between frames, and compare the actual arrival time with Squeeze's.
-function finishEntry(from,to){
+function finishEntry(from,to,finish){
  let enter=0,leave=1;
  for(const [axis,half] of [['x',FINISH_HALF_WIDTH],['z',.35]]){
-  const delta=to[axis]-from[axis],lo=FINISH[axis]-half,hi=FINISH[axis]+half;
+  const delta=to[axis]-from[axis],lo=finish[axis]-half,hi=finish[axis]+half;
   if(Math.abs(delta)<1e-9){if(from[axis]<lo||from[axis]>hi)return Infinity;}
   else{const a=(lo-from[axis])/delta,b=(hi-from[axis])/delta;enter=Math.max(enter,Math.min(a,b));leave=Math.min(leave,Math.max(a,b));}
  }
