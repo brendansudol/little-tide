@@ -1,4 +1,6 @@
 import * as THREE from './vendor/three.module.js';
+import { shore, ground, canDive, nextDepth, petDistance, SWIMMER_Y, SHARK_REACH, REEF } from './ocean.js';
+import { createReef } from './reef.js';
 
 const canvas=document.querySelector('#world');
 const scene=new THREE.Scene();scene.background=new THREE.Color('#93dfe2');scene.fog=new THREE.FogExp2('#a9e4df',.008);
@@ -15,10 +17,30 @@ function ball(parent,m,x,y,z,sx,sy=sx,sz=sx){const o=mesh(new THREE.SphereGeomet
 function cylinderBetween(a,b,r1,r2,m,parent){const v=new THREE.Vector3().subVectors(b,a);const o=mesh(new THREE.CylinderGeometry(r2,r1,v.length(),7),m,parent);o.position.copy(a).add(b).multiplyScalar(.5);o.quaternion.setFromUnitVectors(new THREE.Vector3(0,1,0),v.normalize());return o;}
 function line(points,color,parent,width=1){const o=new THREE.Line(new THREE.BufferGeometry().setFromPoints(points.map(p=>new THREE.Vector3(...p))),new THREE.LineBasicMaterial({color,transparent:true,opacity:.8,linewidth:width}));parent.add(o);return o;}
 let seed=47;function rand(){seed=(seed*16807)%2147483647;return(seed-1)/2147483646;}function range(a,b){return a+rand()*(b-a);}
-const shore=x=>1.1*Math.sin(x*.115)+.55*Math.cos(x*.3);
-function ground(x,z){const d=z-shore(x);return d>=0?.3+Math.min(d,25)*.036:-Math.min(-d*.14,2.8)+.3;}
 const landGeo=new THREE.PlaneGeometry(180,180,120,120);landGeo.rotateX(-Math.PI/2);let pos=landGeo.attributes.position,colors=[];
-for(let i=0;i<pos.count;i++){const x=pos.getX(i),z=pos.getZ(i),d=z-shore(x);pos.setY(i,ground(x,z));const c=new THREE.Color(d>26?'#94ba71':d>23?'#c6c888':d<1?'#dfcc93':'#f4dbab');c.multiplyScalar(.97+rand()*.06);colors.push(c.r,c.g,c.b);}landGeo.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));landGeo.computeVertexNormals();mesh(landGeo,new THREE.MeshStandardMaterial({vertexColors:true,roughness:1}),scene);
+const reefSand = new THREE.Color('#75b3ae');
+for(let i=0;i<pos.count;i++){const x=pos.getX(i),z=pos.getZ(i),d=z-shore(x);pos.setY(i,ground(x,z));const c=new THREE.Color(d>26?'#94ba71':d>23?'#c6c888':d<1?'#dfcc93':'#f4dbab');c.lerp(reefSand,THREE.MathUtils.smoothstep(-d,15,48));c.multiplyScalar(.97+rand()*.06);colors.push(c.r,c.g,c.b);}landGeo.setAttribute('color',new THREE.Float32BufferAttribute(colors,3));landGeo.computeVertexNormals();
+const seaFloor = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: 1 });
+const rippleTime = { value: 0 };
+seaFloor.onBeforeCompile = shader => {
+  shader.uniforms.rippleTime = rippleTime;
+  shader.vertexShader = 'varying vec3 beachPoint;\n' + shader.vertexShader.replace(
+    '#include <begin_vertex>', '#include <begin_vertex>\nbeachPoint = position;'
+  );
+  shader.fragmentShader = 'varying vec3 beachPoint;\nuniform float rippleTime;\n' +
+    shader.fragmentShader.replace('#include <color_fragment>', `#include <color_fragment>
+      float submerged = smoothstep(1.5, 5.0, -beachPoint.y);
+      if (submerged > 0.0) {
+        vec2 p = beachPoint.xz * 1.55;
+        float t = rippleTime * .42;
+        vec2 wave = p + .7 * vec2(sin(p.y * .6 + t), cos(p.x * .72 - t));
+        float ridge = abs(sin(wave.x + t * .4) + .84 * cos(wave.y - t * .3));
+        float light = 1.0 - smoothstep(.02, .22, ridge);
+        diffuseColor.rgb *= mix(vec3(1.0), vec3(.54, .81, .9), submerged);
+        diffuseColor.rgb += submerged * light * vec3(.10, .17, .14);
+      }`);
+};
+mesh(landGeo, seaFloor, scene);
 const waterGeo=new THREE.PlaneGeometry(180,100,140,90);waterGeo.rotateX(-Math.PI/2);const wp=waterGeo.attributes.position;
 for(let i=0;i<wp.count;i++){const x=wp.getX(i),t=(wp.getZ(i)+50)/100;wp.setZ(i,shore(x)-t*120);wp.setY(i,.38);}waterGeo.computeVertexNormals();
 const waterMat=new THREE.ShaderMaterial({side:THREE.DoubleSide,transparent:true,depthWrite:false,uniforms:{time:{value:0}},vertexShader:`uniform float time;varying vec3 vP;void main(){vec3 p=position;p.y+=sin(p.x*.7+p.z*.6+time*.9)*.038;vP=p;gl_Position=projectionMatrix*modelViewMatrix*vec4(p,1.);}`,fragmentShader:`uniform float time;varying vec3 vP;void main(){float depth=clamp(-vP.z/42.,0.,1.);vec3 c=mix(vec3(.19,.78,.72),vec3(.04,.51,.63),depth);float a=sin(vP.x*1.9+sin(vP.z*1.5+time*.36)*2.+time*.4);float b=sin(vP.z*2.2+sin(vP.x*1.4-time*.3)*1.7);float shimmer=pow(max(0.,a*b),13.);c+=vec3(.30,.40,.30)*shimmer*.42;float band=pow(max(0.,sin(vP.z*1.2+vP.x*.24+time*.7)),35.)*.08;c+=band;gl_FragColor=vec4(c,.48+depth*.28);}`});const ocean=mesh(waterGeo,waterMat,scene);ocean.castShadow=false;ocean.receiveShadow=false;ocean.renderOrder=2;
@@ -43,51 +65,278 @@ const ring=mesh(new THREE.TorusGeometry(.43,.12,8,24),mat('#ffb85f'),body,0,.72,
 // Gentle rays with animated pectoral fins and spotted backs.
 const rays=[];const rayMat=mat('#607f83',{side:THREE.DoubleSide}),raySpot=mat('#aac3b6');
 function makeRay(x,z,name,index){const group=new THREE.Group();scene.add(group);const core=ball(group,rayMat,0,0,0,.57,.12,.64);const wings=[];for(const side of [-1,1]){const geo=new THREE.BufferGeometry();geo.setAttribute('position',new THREE.Float32BufferAttribute([0,0,.52,side*1.38,-.035,-.12,0,0,-.55,side*.42,.12,-.05],3));geo.setIndex([0,1,3,1,2,3,2,0,3]);geo.computeVertexNormals();wings.push(mesh(geo,rayMat,group));ball(group,eye,side*.2,.13,.32,.047,.04,.045);for(let j=0;j<4;j++)ball(group,raySpot,side*(.3+j*.12),.09-j*.014,.04-j*.09,.04,.011,.035);}
-const tailCurve=new THREE.CatmullRomCurve3([new THREE.Vector3(0,0,-.4),new THREE.Vector3(.02,-.03,-.95),new THREE.Vector3(.17,.05,-1.55),new THREE.Vector3(.28,.1,-1.95)]);mesh(new THREE.TubeGeometry(tailCurve,14,.024,5,false),rayMat,group);group.position.set(x,ground(x,z)+.55,z);rays.push({group,wings,x,z,name,index,pet:0});}
+const tailCurve=new THREE.CatmullRomCurve3([new THREE.Vector3(0,0,-.4),new THREE.Vector3(.02,-.03,-.95),new THREE.Vector3(.17,.05,-1.55),new THREE.Vector3(.28,.1,-1.95)]);mesh(new THREE.TubeGeometry(tailCurve,14,.024,5,false),rayMat,group);group.position.set(x,ground(x,z)+.55,z);rays.push({kind:'ray',group,wings,x,z,name,index,pet:0});}
 makeRay(1,-4.5,'Sunny',0);makeRay(8,-9,'Pebble',1);makeRay(-10,-11,'Ripple',2);makeRay(17,-17,'Blue',3);
 const shrimp=[];const shrimpMat=mat('#ed936e'),shrimpTail=mat('#f7b895');
 for(let i=0;i<15;i++){const x=i<6?-4+(i%3)*.8:range(-16,15),z=i<6?-2.2-Math.floor(i/3)*1.1:range(-13,-3);const g=new THREE.Group();scene.add(g);for(let j=0;j<6;j++)ball(g,j%2?shrimpMat:shrimpTail,0,Math.sin(j*.45)*.12,-j*.10,.10-j*.009,.09-j*.006,.09);ball(g,shrimpMat,0,.12,-.63,.18,.035,.09);for(const side of [-1,1]){ball(g,eye,side*.055,.05,.11,.025);line([[side*.055,.06,.1],[side*.18,.13,.3],[side*.29,.14,.39]],'#da8f69',g);for(let j=0;j<3;j++)line([[0,.015,-j*.11],[side*.17,-.06,-j*.11-.07]],'#df9875',g);}g.scale.setScalar(1.3);g.position.set(x,ground(x,z)+.22,z);shrimp.push({group:g,x,z});}
 // Distant islands and seabirds keep the horizon alive.
 for(const [x,z,s] of [[-49,-48,10],[35,-65,13],[66,-47,8]]){let island=mesh(new THREE.SphereGeometry(1,9,6),mat('#79ae98'),scene,x,-.6,z);island.scale.set(s,2.4,s*.6);}const birds=[];for(let i=0;i<6;i++){const b=new THREE.Group();line([[-.5,0,0],[-.2,.14,0],[0,0,0],[.2,.14,0],[.5,0,0]],'#f6fff3',b);scene.add(b);birds.push(b);}
-const keys=new Set();let yaw=.28,pitch=.69,distance=25,drag=false,lastX=0,lastY=0,jumpV=0,jumpY=0,petUntil=0,nearest=null,discovered={ray:false,shrimp:false},joy={x:0,y:0},touchId=null,toastTimer;
+const reef = createReef(scene, { mat, mesh, ball });
+const oceanFriends = [...rays, reef.friend];
+const keys=new Set();let yaw=.28,pitch=.69,distance=25,drag=false,lastX=0,lastY=0,jumpV=0,jumpY=0,petUntil=0,joy={x:0,y:0},touchId=null,toastTimer;
+const discovered = { ray: false, shrimp: false, shark: false };
+let diving = false, depth = 0, viewBlend = 0;
 const $=s=>document.querySelector(s);function toast(message){$('#toast').textContent=message;$('#toast').classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>$('#toast').classList.remove('show'),3800);}
-function discover(type){if(discovered[type])return;discovered[type]=true;const card=$('#'+type+'-card');card.classList.add('found');card.querySelector('.check').textContent='✓';$('#friend-count').textContent=Object.values(discovered).filter(Boolean).length+' / 2';if(type==='shrimp'){$('#shrimp-status').textContent='Tiny dancers, big personalities';toast('Little shrimp! You found the shallows’ tiny dancers.');}else $('#ray-status').textContent='A new friend, gently petted';}
-function pet(){if(!nearest){toast('Walk into the shallows and get close to a stingray.');return;}if(performance.now()<petUntil)return;petUntil=performance.now()+2500;nearest.pet=petUntil;boy.rotation.y=Math.atan2(nearest.group.position.x-boy.position.x,nearest.group.position.z-boy.position.z);discover('ray');toast(nearest.name+' loves that gentle pat!');for(let i=0;i<7;i++)makeHeart(nearest.group.position,i);chime();}
+function discover(kind) {
+  if (discovered[kind]) return;
+  discovered[kind] = true;
+  const card = $('#' + kind + '-card');
+  card.classList.add('found');
+  card.querySelector('.check').textContent = '✓';
+  const friends = Object.values(discovered);
+  $('#friend-count').textContent = friends.filter(Boolean).length + ' / ' + friends.length;
+  if (kind === 'shrimp') {
+    $('#shrimp-status').textContent = 'Tiny dancers, big personalities';
+    toast('Little shrimp! You found the shallows’ tiny dancers.');
+  } else {
+    $('#' + kind + '-status').textContent = kind === 'shark' ? 'Finn loves a gentle pat' : 'A new friend, gently petted';
+  }
+}
+function nearbyFriend(kind) {
+  let nearest = null, best = Infinity;
+  for (const friend of oceanFriends) {
+    if (kind && friend.kind !== kind) continue;
+    const p = friend.group.position;
+    // Rays can be petted from the surface as they glide beneath the swimmer.
+    const distance = friend.kind === 'ray' && depth === 0
+      ? Math.hypot(boy.position.x - p.x, boy.position.z - p.z)
+      : petDistance(boy.position, p);
+    if (distance < (friend.kind === 'shark' ? SHARK_REACH : 2.9) && distance < best) {
+      nearest = friend;
+      best = distance;
+    }
+  }
+  return nearest;
+}
+function pet(friend) {
+  const now = performance.now();
+  if (now < petUntil) return;
+  friend.pet = petUntil = now + 2500;
+  const p = friend.group.position;
+  boy.rotation.y = Math.atan2(p.x - boy.position.x, p.z - boy.position.z);
+  discover(friend.kind);
+  toast(friend.kind === 'shark' ? 'Finn gives a happy tail wiggle!' : friend.name + ' loves that gentle pat!');
+  for (let i = 0; i < 7; i++) makeHeart(p, i);
+  chime();
+}
+function setDiving(value) {
+  if (value && !canDive(boy.position.x, boy.position.z)) return;
+  diving = value;
+  jumpV = jumpY = 0;
+}
+function interact() {
+  const friend = nearbyFriend();
+  if (friend) pet(friend);
+  else if (canDive(boy.position.x, boy.position.z)) setDiving(!diving);
+  else toast('Meet the stingrays in the shallows or swim out to the striped buoy.');
+}
 const hearts=[];const heartShape=new THREE.Shape();heartShape.moveTo(0,.1);heartShape.bezierCurveTo(.35,.45,.55,.0,0,-.35);heartShape.bezierCurveTo(-.55,0,-.35,.45,0,.1);const heartGeo=new THREE.ShapeGeometry(heartShape);
-function makeHeart(p,i){const h=mesh(heartGeo,new THREE.MeshBasicMaterial({color:i%2?'#ffad8b':'#f87666',side:THREE.DoubleSide,transparent:true}),scene,p.x+range(-.5,.5),.8+i*.13,p.z+range(-.3,.3));h.scale.setScalar(.35);h.renderOrder=4;hearts.push({mesh:h,born:performance.now()+i*90});}
-function jump(){if(jumpY===0)jumpV=4.5;}
-addEventListener('keydown',e=>{if($('#help-dialog').open)return;if(['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key))e.preventDefault();keys.add(e.key.toLowerCase());if(e.code==='Space')jump();if(e.key.toLowerCase()==='e')pet();});addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));addEventListener('blur',()=>{keys.clear();joy={x:0,y:0};drag=false;});
+function makeHeart(p,i){const y=depth>.3?p.y+.7:Math.max(.8,p.y+.35);const h=mesh(heartGeo,new THREE.MeshBasicMaterial({color:i%2?'#ffad8b':'#f87666',side:THREE.DoubleSide,transparent:true}),scene,p.x+range(-.5,.5),y+i*.13,p.z+range(-.3,.3));h.scale.setScalar(.35);h.renderOrder=4;hearts.push({mesh:h,born:performance.now()+i*90});}
+function jump() {
+  if (diving || depth > 0) setDiving(false);
+  else if (jumpY === 0) jumpV = 4.5;
+}
+addEventListener('keydown', e => {
+  if ($('#help-dialog').open) return;
+  if (['ArrowUp','ArrowDown','ArrowLeft','ArrowRight',' '].includes(e.key)) e.preventDefault();
+  const key = e.key.toLowerCase();
+  keys.add(key);
+  if (e.repeat) return;
+  if (e.code === 'Space') jump();
+  if (key === 'c') setDiving(!diving);
+  if (key === 'e') interact();
+});
+addEventListener('keyup',e=>keys.delete(e.key.toLowerCase()));addEventListener('blur',()=>{keys.clear();joy={x:0,y:0};drag=false;});
 const pointers=new Map();let pinchDistance=0;
 canvas.addEventListener('pointerdown',e=>{pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size===2){const p=[...pointers.values()];pinchDistance=Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y);}drag=true;lastX=e.clientX;lastY=e.clientY;canvas.setPointerCapture(e.pointerId);});canvas.addEventListener('pointermove',e=>{if(!drag)return;pointers.set(e.pointerId,{x:e.clientX,y:e.clientY});if(pointers.size===2){const p=[...pointers.values()],d=Math.hypot(p[0].x-p[1].x,p[0].y-p[1].y);distance=THREE.MathUtils.clamp(distance-(d-pinchDistance)*.055,10,38);pinchDistance=d;lastX=e.clientX;lastY=e.clientY;return;}yaw-=(e.clientX-lastX)*.006;pitch=THREE.MathUtils.clamp(pitch+(e.clientY-lastY)*.003,.3,1.15);lastX=e.clientX;lastY=e.clientY;});canvas.addEventListener('pointerup',e=>{pointers.delete(e.pointerId);drag=false;});canvas.addEventListener('pointercancel',e=>{pointers.delete(e.pointerId);drag=false;});canvas.addEventListener('wheel',e=>{e.preventDefault();distance=THREE.MathUtils.clamp(distance+e.deltaY*.02,10,38);},{passive:false});
-$('#interact').onclick=pet;$('#jump').onclick=jump;$('#help').onclick=()=>{keys.clear();$('#help-dialog').showModal();};$('#close-help').onclick=$('#back').onclick=()=>$('#help-dialog').close();$('#help-dialog').addEventListener('click',e=>{if(e.target===$('#help-dialog'))$('#help-dialog').close();});
+$('#interact').onclick=interact;$('#jump').onclick=jump;$('#help').onclick=()=>{keys.clear();$('#help-dialog').showModal();};$('#close-help').onclick=$('#back').onclick=()=>$('#help-dialog').close();$('#help-dialog').addEventListener('click',e=>{if(e.target===$('#help-dialog'))$('#help-dialog').close();});
 const joystick=$('#joystick');function moveJoy(e){const b=joystick.getBoundingClientRect(),x=e.clientX-b.left-48,y=e.clientY-b.top-48,l=Math.max(32,Math.hypot(x,y));joy={x:x/l,y:y/l};$('#stick').style.transform=`translate(${joy.x*29}px,${joy.y*29}px)`;}
 joystick.addEventListener('pointerdown',e=>{touchId=e.pointerId;joystick.setPointerCapture(e.pointerId);moveJoy(e);});joystick.addEventListener('pointermove',e=>{if(touchId===e.pointerId)moveJoy(e);});function resetJoy(){touchId=null;joy={x:0,y:0};$('#stick').style.transform='none';}joystick.addEventListener('pointerup',resetJoy);joystick.addEventListener('pointercancel',resetJoy);
 let audioCtx,audioGain,soundOn=false;function setupAudio(){audioCtx=new (window.AudioContext||window.webkitAudioContext)();const buffer=audioCtx.createBuffer(1,audioCtx.sampleRate*4,audioCtx.sampleRate),data=buffer.getChannelData(0);let brown=0;for(let i=0;i<data.length;i++){brown=(brown+Math.random()*.04-.02)/1.02;data[i]=brown*3;}const source=audioCtx.createBufferSource();source.buffer=buffer;source.loop=true;const filter=audioCtx.createBiquadFilter();filter.type='lowpass';filter.frequency.value=700;audioGain=audioCtx.createGain();audioGain.gain.value=0;source.connect(filter).connect(audioGain).connect(audioCtx.destination);source.start();}
 $('#sound').onclick=async()=>{try{if(!audioCtx)setupAudio();await audioCtx.resume();soundOn=!soundOn;audioGain.gain.setTargetAtTime(soundOn?.24:0,audioCtx.currentTime,.4);$('#sound .off-dot').style.display=soundOn?'none':'block';$('#sound').setAttribute('aria-label',soundOn?'Turn ocean sound off':'Turn ocean sound on');$('#sound').title=soundOn?'Turn ocean sound off':'Turn ocean sound on';}catch{toast('Ocean sound is unavailable in this browser.');}};
 function chime(){if(!soundOn)return;[523.25,659.25,783.99].forEach((f,i)=>{const o=audioCtx.createOscillator(),g=audioCtx.createGain(),t=audioCtx.currentTime+i*.12;o.type='sine';o.frequency.value=f;g.gain.setValueAtTime(0,t);g.gain.linearRampToValueAtTime(.065,t+.025);g.gain.exponentialRampToValueAtTime(.001,t+.6);o.connect(g).connect(audioCtx.destination);o.start(t);o.stop(t+.6);});}
-const map=$('#map'),ctx=map.getContext('2d');function drawMap(){ctx.fillStyle='#68bcb5';ctx.fillRect(0,0,220,220);ctx.fillStyle='#e8d9a4';ctx.beginPath();ctx.moveTo(0,125);for(let i=0;i<=220;i+=4)ctx.lineTo(i,125+Math.sin(i*.022)*15);ctx.lineTo(220,220);ctx.lineTo(0,220);ctx.fill();ctx.strokeStyle='#eff4c9';ctx.lineWidth=4;ctx.beginPath();for(let i=0;i<=220;i+=4)ctx.lineTo(i,120+Math.sin(i*.022)*15);ctx.stroke();for(const r of rays){ctx.fillStyle='#407c7e';ctx.beginPath();ctx.ellipse(110+r.group.position.x*3,125+r.group.position.z*3,5,3,0,0,Math.PI*2);ctx.fill();}ctx.fillStyle='#ff8054';ctx.strokeStyle='#fff7df';ctx.lineWidth=3;ctx.beginPath();ctx.arc(110+boy.position.x*3,125+boy.position.z*3,6,0,7);ctx.fill();ctx.stroke();}
+const map = $('#map'), ctx = map.getContext('2d');
+const mapX = x => 110 + x * 1.85, mapZ = z => 132 + z * 1.85;
+const mapSea = ctx.createLinearGradient(0, 20, 0, 125);
+mapSea.addColorStop(0, '#357f90');
+mapSea.addColorStop(1, '#85cec1');
+function drawMap() {
+  ctx.fillStyle = mapSea;
+  ctx.fillRect(0, 0, 220, 220);
+  ctx.beginPath();
+  for (let x = -60; x <= 60; x += 2) ctx.lineTo(mapX(x), mapZ(shore(x)));
+  ctx.strokeStyle = '#eff4c9';
+  ctx.lineWidth = 4;
+  ctx.stroke();
+  ctx.lineTo(222, 220);
+  ctx.lineTo(-2, 220);
+  ctx.fillStyle = '#e8d9a4';
+  ctx.fill();
+  ctx.fillStyle = '#407c7e';
+  for (const r of rays) {
+    ctx.beginPath();
+    ctx.ellipse(mapX(r.group.position.x), mapZ(r.group.position.z), 5, 3, 0, 0, Math.PI * 2);
+    ctx.fill();
+  }
+  ctx.lineWidth = 3;
+  ctx.strokeStyle = '#fff7df';
+  ctx.fillStyle = '#f5ab51';
+  ctx.fillRect(mapX(REEF.x) - 3, mapZ(REEF.z) - 4, 6, 8);
+  ctx.strokeRect(mapX(REEF.x) - 3, mapZ(REEF.z) - 4, 6, 8);
+  ctx.fillStyle = '#ff8054';
+  ctx.beginPath();
+  ctx.arc(mapX(boy.position.x), mapZ(boy.position.z), 6, 0, Math.PI * 2);
+  ctx.fill();
+  ctx.stroke();
+}
+const action = $('#interact'), actionTitle = action.querySelector('strong'), actionHint = action.querySelector('small');
+const label = $('#creature-label'), labelPoint = new THREE.Vector3();
+function updateHud() {
+  const p = boy.position, underwater = depth > .25, offshore = canDive(p.x, p.z);
+  const inWater = p.z < shore(p.x) - .5;
+  const friend = nearbyFriend();
+  $('#zone').textContent = underwater ? Math.max(1, Math.round(depth)) + ' m deep' :
+    offshore ? 'Over the reef' : swimming ? 'Swimming' : inWater ? 'In the shallows' : 'On the beach';
+  $('#weather-name').textContent = underwater ? 'Shark reef' : 'Sunny shores';
+  $('.weather .sun').textContent = underwater ? '≈' : '☀';
+  document.body.classList.toggle('submerged', underwater);
+  $('#jump').setAttribute('aria-label', diving || depth > 0 ? 'Swim to the surface' : 'Jump');
+  $('#space-action').textContent = diving || depth > 0 ? 'surface' : 'jump';
+  action.classList.toggle('ready', Boolean(friend) || offshore);
+  action.classList.toggle('water-action', !friend && offshore);
+  action.querySelector('.action-key').textContent = friend ? 'E' : offshore ? 'C' : '↑';
+  action.querySelector('.interact-icon').textContent = friend ? '♡' : '≈';
+  if (friend) {
+    actionTitle.textContent = friend.kind === 'shark' ? 'Pet Finn' : 'Say hello to ' + friend.name;
+    actionHint.textContent = 'Give this friendly ' + (friend.kind === 'shark' ? 'shark' : 'stingray') + ' a gentle pat';
+  } else if (offshore) {
+    actionTitle.textContent = diving ? 'Surface' : 'Dive to the reef';
+    actionHint.textContent = diving ? 'Float back up whenever you like' : 'Look for Finn by the striped buoy';
+  } else {
+    actionTitle.textContent = swimming ? 'Swim toward the striped buoy' : inWater ? 'Meet your ocean neighbors' : 'Dip your toes in';
+    actionHint.textContent = swimming ? 'The water gets deeper out there' : inWater ? 'Get close to a stingray to pet it' : 'Walk toward the turquoise water';
+  }
+  for (const s of shrimp) {
+    if (Math.hypot(s.group.position.x - p.x, s.group.position.z - p.z) < 2.4) { discover('shrimp'); break; }
+  }
+  if (underwater) {
+    labelPoint.copy(reef.friend.group.position);
+    labelPoint.y += 1.48;
+    $('#creature-name').textContent = 'Finn the friendly shark';
+  } else if (swimming) {
+    labelPoint.copy(reef.buoy.position);
+    labelPoint.y += 1.7;
+    $('#creature-name').textContent = 'Shark reef';
+  } else {
+    labelPoint.copy(rays[0].group.position);
+    labelPoint.y += .8;
+    $('#creature-name').textContent = 'A friendly stingray';
+  }
+  const showLabel = swimming ? labelPoint.distanceTo(p) < (underwater ? 17 : 37) : !discovered.ray;
+  labelPoint.project(camera);
+  label.hidden = !showLabel || Math.abs(labelPoint.z) > 1 || Math.abs(labelPoint.x) > .94 || Math.abs(labelPoint.y) > .94;
+  label.style.left = (labelPoint.x * .5 + .5) * innerWidth + 'px';
+  label.style.top = (-labelPoint.y * .5 + .5) * innerHeight + 'px';
+  drawMap();
+}
 const target=new THREE.Vector3(0,0,0),desired=new THREE.Vector3(),clock=new THREE.Clock();let uiTick=0;let moving=false;let swimming=false;
-function animate(){requestAnimationFrame(animate);const dt=Math.min(clock.getDelta(),.04),t=clock.elapsedTime,now=performance.now();waterMat.uniforms.time.value=t;
-let sx=(keys.has('d')||keys.has('arrowright')?1:0)-(keys.has('a')||keys.has('arrowleft')?1:0)+joy.x,sy=(keys.has('s')||keys.has('arrowdown')?1:0)-(keys.has('w')||keys.has('arrowup')?1:0)+joy.y;if($('#help-dialog').open)sx=sy=0;const mag=Math.hypot(sx,sy);moving=mag>.08;swimming=boy.position.z<shore(boy.position.x)-5.8;
-if(moving){sx/=Math.max(1,mag);sy/=Math.max(1,mag);const vx=sx*Math.cos(yaw)+sy*Math.sin(yaw),vz=-sx*Math.sin(yaw)+sy*Math.cos(yaw),speed=(keys.has('shift')?6.5:4)*(swimming?.74:1);boy.position.x=THREE.MathUtils.clamp(boy.position.x+vx*dt*speed,-37,37);boy.position.z=THREE.MathUtils.clamp(boy.position.z+vz*dt*speed,-32,30);const angle=Math.atan2(vx,vz);boy.rotation.y+=Math.atan2(Math.sin(angle-boy.rotation.y),Math.cos(angle-boy.rotation.y))*Math.min(1,dt*12);}
-if(jumpV!==0||jumpY>0){jumpY+=jumpV*dt;jumpV-=12*dt;if(jumpY<0){jumpY=0;jumpV=0;}}boy.position.y=(swimming?-.55+Math.sin(t*2)*.055:ground(boy.position.x,boy.position.z))+jumpY;ring.visible=swimming;body.rotation.x=swimming?.15:0;const walk=moving?Math.sin(t*(keys.has('shift')?14:10))*.65:Math.sin(t*2)*.025;limbs.leftLeg.rotation.x=walk;limbs.rightLeg.rotation.x=-walk;limbs.leftArm.rotation.x=-walk*.8;limbs.rightArm.rotation.x=now<petUntil?-1.2+Math.sin(t*10)*.16:walk*.8;limbs.rightArm.rotation.z=now<petUntil?-.38:0;body.position.y=moving&&!swimming?Math.abs(Math.sin(t*10))*.045:0;
+const beachSky = scene.background.clone(), seaMist = scene.fog.color.clone(), deepWater = new THREE.Color('#257f91');
+function updateCamera(dt) {
+  const p = boy.position;
+  const immersion = THREE.MathUtils.smoothstep(depth, 0, .85);
+  viewBlend = THREE.MathUtils.lerp(viewBlend, immersion, 1 - Math.exp(-dt * 4));
+  // A portrait screen still needs room for the swimmer and Finn side by side.
+  const zoom = THREE.MathUtils.lerp(1, THREE.MathUtils.clamp(camera.aspect / .9, .45, 1), viewBlend);
+  if (Math.abs(camera.zoom - zoom) > .001) {
+    camera.zoom = zoom;
+    camera.updateProjectionMatrix();
+  }
+  desired.set(p.x - Math.sin(yaw) * 1.6 * viewBlend, (p.y + .75) * viewBlend,
+    p.z - 3.8 * (1 - viewBlend) - Math.cos(yaw) * 1.6 * viewBlend);
+  if (viewBlend > .01) {
+    const finn = reef.friend.group.position;
+    const framing = .32 * viewBlend * (1 - THREE.MathUtils.smoothstep(petDistance(p, finn), 3, 6));
+    desired.lerp(finn, framing);
+  }
+  target.lerp(desired, 1 - Math.exp(-dt * 4));
+  const boom = THREE.MathUtils.lerp(distance, THREE.MathUtils.clamp(distance * .41, 5.5, 12), viewBlend);
+  const angle = pitch * (1 - .58 * viewBlend);
+  camera.position.set(target.x + Math.sin(yaw) * boom * Math.cos(angle), target.y + Math.sin(angle) * boom,
+    target.z + Math.cos(yaw) * boom * Math.cos(angle));
+  if (viewBlend > .001) {
+    const floor = ground(camera.position.x, camera.position.z) + .7;
+    camera.position.y = Math.max(floor, THREE.MathUtils.lerp(camera.position.y, Math.min(camera.position.y, -.25), viewBlend));
+  }
+  camera.lookAt(target);
+  camera.updateMatrixWorld();
+  const tint = THREE.MathUtils.smoothstep(.38 - camera.position.y, 0, 1.2);
+  scene.background.copy(beachSky).lerp(deepWater, tint);
+  scene.fog.color.copy(seaMist).lerp(deepWater, tint);
+  scene.fog.density = THREE.MathUtils.lerp(.008, .043, tint);
+  sun.intensity = THREE.MathUtils.lerp(3.8, 2.5, tint);
+}
+function animate(){requestAnimationFrame(animate);const dt=Math.min(clock.getDelta(),.04),t=clock.elapsedTime,now=performance.now();waterMat.uniforms.time.value=rippleTime.value=t;
+let sx=(keys.has('d')||keys.has('arrowright')?1:0)-(keys.has('a')||keys.has('arrowleft')?1:0)+joy.x,sy=(keys.has('s')||keys.has('arrowdown')?1:0)-(keys.has('w')||keys.has('arrowup')?1:0)+joy.y;if($('#help-dialog').open)sx=sy=0;const mag=Math.hypot(sx,sy);moving=mag>.08;
+if (moving) {
+  sx /= Math.max(1, mag);
+  sy /= Math.max(1, mag);
+  const vx = sx * Math.cos(yaw) + sy * Math.sin(yaw), vz = -sx * Math.sin(yaw) + sy * Math.cos(yaw);
+  const speed = (keys.has('shift') ? 6.5 : 4) * (swimming && !diving ? .74 : 1);
+  boy.position.x = THREE.MathUtils.clamp(boy.position.x + vx * dt * speed, -37, 37);
+  boy.position.z = THREE.MathUtils.clamp(boy.position.z + vz * dt * speed, -54, 30);
+  const turn = Math.atan2(vx, vz) - boy.rotation.y;
+  boy.rotation.y += Math.atan2(Math.sin(turn), Math.cos(turn)) * Math.min(1, dt * 12);
+}
+swimming = boy.position.z < shore(boy.position.x) - 5.8;
+if (!canDive(boy.position.x, boy.position.z)) diving = false;
+depth = nextDepth(depth, diving, boy.position.x, boy.position.z, dt);
+if(jumpV!==0||jumpY>0){jumpY+=jumpV*dt;jumpV-=12*dt;if(jumpY<0){jumpY=0;jumpV=0;}}
+boy.position.y = (swimming ? SWIMMER_Y - depth + Math.sin(t * 2) * .055 : ground(boy.position.x, boy.position.z)) + jumpY;
+const stroke = THREE.MathUtils.smoothstep(depth, 0, .85);
+ring.visible = swimming && stroke < .35;
+body.rotation.x = swimming ? .15 + stroke * .96 : 0;
+body.position.z = -.72 * stroke;
+const walk=moving?Math.sin(t*(keys.has('shift')?14:10))*.65:Math.sin(t*2)*.025;
+limbs.leftLeg.rotation.x=walk;limbs.rightLeg.rotation.x=-walk;
+limbs.leftArm.rotation.x=-walk*.8-stroke*.9;limbs.rightArm.rotation.x=now<petUntil?-1.2+Math.sin(t*10)*.16:walk*.8-stroke*.9;limbs.rightArm.rotation.z=now<petUntil?-.38:0;body.position.y=moving&&!swimming?Math.abs(Math.sin(t*10))*.045:0;
+reef.update(dt, t, now, boy.position);
 for(const r of rays){const petted=now<r.pet;const a=t*.15+r.index*2;r.group.position.x=r.x+Math.sin(a)*1.15;r.group.position.z=r.z+Math.cos(a*.8)*.7;r.group.position.y=Math.max(-1.55,ground(r.group.position.x,r.group.position.z)+.47)+Math.sin(t*1.4+r.index)*.075;r.group.rotation.y=Math.atan2(Math.cos(a)*.17,-Math.sin(a*.8)*.084);r.wings.forEach((w,i)=>w.rotation.z=Math.sin(t*(petted?5:2)+r.index)*.13*(i===0?1:-1));}
 for(let i=0;i<shrimp.length;i++){const s=shrimp[i];s.group.position.x=s.x+Math.sin(t*.9+i)*.18;s.group.position.y=ground(s.group.position.x,s.z)+.22+Math.abs(Math.sin(t*2+i))*.05;s.group.rotation.y=Math.sin(t*.5+i)*.4;}
 for(let i=0;i<birds.length;i++){birds[i].position.set(Math.sin(t*.035+i)*29,12+i*.7,-20+Math.cos(t*.035+i)*14);birds[i].rotation.y=-t*.035-i;birds[i].rotation.z=Math.sin(t*3+i)*.12;}
 foam.forEach((f,i)=>{f.position.z=Math.sin(t*.7-i*.9)*.3;f.material.opacity=(.31-i*.075)+Math.sin(t*.7-i*.9)*.09;});
 for(let i=hearts.length-1;i>=0;i--){const h=hearts[i],life=(now-h.born)/1800;h.mesh.visible=life>=0;h.mesh.position.y+=dt*.6;h.mesh.quaternion.copy(camera.quaternion);h.mesh.material.opacity=Math.max(0,1-life);if(life>1){scene.remove(h.mesh);h.mesh.material.dispose();hearts.splice(i,1);}}
-// Smooth follow leaves the beach and ocean visible around the player.
-desired.set(boy.position.x,0,boy.position.z-3.8);target.lerp(desired,1-Math.exp(-dt*3));camera.position.set(target.x+Math.sin(yaw)*distance*Math.cos(pitch),target.y+Math.sin(pitch)*distance,target.z+Math.cos(yaw)*distance*Math.cos(pitch));camera.lookAt(target);
-if((uiTick+=dt)>.1){uiTick=0;nearest=rays.reduce((best,r)=>{const d=Math.hypot(r.group.position.x-boy.position.x,r.group.position.z-boy.position.z);return d<2.9&&(!best||d<best.d)?{r,d}:best;},null)?.r||null;const inWater=boy.position.z<shore(boy.position.x)-.5;$('#zone').textContent=swimming?'Swimming':inWater?'In the shallows':'On the beach';const action=$('#interact');action.classList.toggle('ready',!!nearest);action.querySelector('strong').textContent=nearest?'Say hello to '+nearest.name:swimming?'You’re swimming!':inWater?'Meet your ocean neighbors':'Dip your toes in';action.querySelector('small').textContent=nearest?'Give this friendly stingray a gentle pat':inWater?'Get close to a stingray to pet it':'Walk toward the turquoise water';action.querySelector('.action-key').textContent=nearest?'E':'↑';action.querySelector('.interact-icon').textContent=nearest?'♡':'≈';for(const s of shrimp){if(Math.hypot(s.group.position.x-boy.position.x,s.group.position.z-boy.position.z)<2.4){discover('shrimp');break;}}const r=rays[0],v=r.group.position.clone();v.y+=.8;v.project(camera);const label=$('#creature-label');label.style.left=(v.x*.5+.5)*innerWidth+'px';label.style.top=(-v.y*.5+.5)*innerHeight+'px';label.style.display=discovered.ray||v.z>1||v.x<-1||v.x>1?'none':'block';drawMap();}
+updateCamera(dt);
+if ((uiTick += dt) > .1) { uiTick = 0; updateHud(); }
 if(audioGain&&soundOn)audioGain.gain.setTargetAtTime(.19+Math.sin(t*.4)*.06,audioCtx.currentTime,.5);renderer.render(scene,camera);}
 addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();renderer.setSize(innerWidth,innerHeight);renderer.setPixelRatio(Math.min(devicePixelRatio,2));});
-const readState=()=>({position:{x:Math.round(boy.position.x*100)/100,z:Math.round(boy.position.z*100)/100},swimming,discovered:{...discovered},nearbyRay:nearest?.name||null});
+const rounded = value => Math.round(value * 100) / 100;
+const readState = () => ({
+  position: { x: rounded(boy.position.x), y: rounded(boy.position.y), z: rounded(boy.position.z) },
+  swimming, diving, depth: rounded(depth), canDive: canDive(boy.position.x, boy.position.z),
+  discovered: { ...discovered },
+  nearbyRay: nearbyFriend('ray')?.name ?? null,
+  nearbyShark: nearbyFriend('shark')?.name ?? null,
+});
 if(document.modelContext?.registerTool){
  const lifecycle=new AbortController();
  const register=tool=>{try{Promise.resolve(document.modelContext.registerTool(tool,{signal:lifecycle.signal})).catch(()=>{});}catch{}};
- register({name:'read_beach_state',description:'Read the boy’s position, swimming state, nearby stingray, and discovered ocean friends.',inputSchema:{type:'object',properties:{},additionalProperties:false},annotations:{readOnlyHint:true},execute:readState});
+ register({name:'read_beach_state',description:'Read the swimmer’s position, depth, dive availability, nearby stingray or shark, and discovered ocean friends.',inputSchema:{type:'object',properties:{},additionalProperties:false},annotations:{readOnlyHint:true},execute:readState});
  register({name:'walk_on_beach',description:'Move the boy using the same camera-relative directions as the movement controls, for up to three seconds.',inputSchema:{type:'object',properties:{direction:{type:'string',enum:['forward','back','left','right']},seconds:{type:'number',minimum:.1,maximum:3}},required:['direction','seconds'],additionalProperties:false},annotations:{readOnlyHint:false},async execute(input){const mapping={forward:'w',back:'s',left:'a',right:'d'};if(!input||!Object.hasOwn(mapping,input.direction)||typeof input.seconds!=='number'||!Number.isFinite(input.seconds)||input.seconds<.1||input.seconds>3)throw new Error('Choose a direction and a duration from 0.1 to 3 seconds.');if($('#help-dialog').open)throw new Error('Close the controls panel before walking.');const key=mapping[input.direction];keys.add(key);try{await new Promise(resolve=>setTimeout(resolve,input.seconds*1000));}finally{keys.delete(key);}return readState();}});
- register({name:'pet_nearby_stingray',description:'Give the nearby stingray a gentle pat. Requires a stingray within reach.',inputSchema:{type:'object',properties:{},additionalProperties:false},annotations:{readOnlyHint:false},execute(){if(!nearest)throw new Error('Walk closer to a stingray first.');pet();return readState();}});
+ register({name:'set_beach_diving',description:'Dive toward the reef floor in deep water or float back to the surface.',inputSchema:{type:'object',properties:{diving:{type:'boolean'}},required:['diving'],additionalProperties:false},annotations:{readOnlyHint:false},execute(input){
+   if ($('#help-dialog').open) throw new Error('Close the controls panel first.');
+   if (typeof input?.diving !== 'boolean') throw new Error('Choose whether to dive.');
+   if (input.diving && !canDive(boy.position.x, boy.position.z)) throw new Error('Swim out toward the striped buoy first.');
+   setDiving(input.diving);
+   return readState();
+ }});
+ for (const [kind, species] of [['ray','stingray'], ['shark','shark']]) {
+   register({name:'pet_nearby_' + species,description:'Gently pet a ' + species + ' within reach.',inputSchema:{type:'object',properties:{},additionalProperties:false},annotations:{readOnlyHint:false},execute(){
+     const friend = nearbyFriend(kind);
+     if (!friend) throw new Error('Get closer to the ' + species + ' first.');
+     pet(friend);
+     return readState();
+   }});
+ }
  addEventListener('pagehide',()=>lifecycle.abort(),{once:true});
 }
 animate();$('#loading').style.opacity='0';setTimeout(()=>$('#loading').remove(),600);

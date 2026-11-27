@@ -2,7 +2,7 @@
 
 Thirteen playful 3D worlds to explore in your browser, built with Three.js.
 
-- **[Beach World](https://brendansudol.github.io/little-tide/)** — walk along the shore, swim with shrimp, and pet friendly stingrays.
+- **[Beach World](https://brendansudol.github.io/little-tide/)** — walk along the shore, swim with shrimp, pet stingrays, and dive at the striped buoy to meet Finn the friendly shark.
 - **[Candy World](https://brendansudol.github.io/little-tide/candy/)** — explore lollipop forests and bounce on marshmallows.
 - **[Impossible Golf](https://brendansudol.github.io/little-tide/golf/)** — six holes connected by underground tubes, with a spinning golf-club windmill that sends you flying.
 
@@ -31,6 +31,8 @@ Thirteen playful 3D worlds to explore in your browser, built with Three.js.
 Use **WASD / arrow keys** to move, **drag** to look, **scroll / pinch** to zoom, and **Space** to jump. Press **E** for nearby interactions. On a phone, use the joystick, jump button, and contextual action button. Open **Menu** for controls, world navigation, and optional map/progress panels.
 
 In Car World, **tap or click the ground** to drive to a destination along a dotted route. The car goes around the café and wash walls and parks on arrival. **Stop here**, the brake, or manual controls cancel the route; dragging/pinching still controls the view. To drive yourself, point the **joystick, WASD, or arrow keys** where you want to go on the screen. The car turns automatically, slows for tight turns, and stops when you let go. Push the joystick gently to creep along. **Space** is an extra brake, **E** enters/exits the car, and **H** honks or waves.
+
+In Beach World, swim toward the orange-striped buoy and press **C** or tap **Dive to the reef**. Swim up to Finn and press **E** or tap **Pet Finn**. Press **Space** or tap **↑** to float back to the surface.
 
 ## Run locally
 

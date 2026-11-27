@@ -5,3 +5,16 @@
 
 .world-menu{position:relative;pointer-events:auto;font-size:13px}.world-menu summary{cursor:pointer;background:#fff9e9ef;border:1px solid #fff;border-radius:24px;padding:13px 16px;list-style:none;white-space:nowrap}.world-menu summary::-webkit-details-marker{display:none}.world-menu nav{position:absolute;top:52px;right:0;display:grid;width:192px;background:#fff8e7;border:1px solid white;padding:7px;border-radius:16px;box-shadow:0 8px 30px #174b4420;z-index:20}.world-menu a{color:#194e44;text-decoration:none;padding:12px;border-radius:10px}.world-menu a:hover,.world-menu a[aria-current]{background:#e6edcd}header:has(.world-menu[open]){z-index:30}@media(max-width:650px){.world-menu{position:absolute;right:0;top:64px;font-size:12px}.world-menu summary{padding:9px 13px}.world-menu nav{top:42px}}
 @media(max-width:650px){footer .interact{bottom:0}}
+
+.shark-icon { background: #d6e9ef; font-size: 21px; }
+.creature-label b { font-weight: 500; }
+.compact-hud .creature-label:not([hidden]) { display: block; }
+.interact.water-action { color: #fffdf0; background: #267a80; border-color: #96d9cf; box-shadow: 0 5px 24px #18666544; }
+.interact.water-action small { opacity: .9; }
+.submerged .intro { visibility: hidden; }
+.submerged .brand { color: #f7ffeb; text-shadow: 0 1px 4px #14565d; }
+.submerged kbd { color: #164b50; text-shadow: none; }
+.submerged .weather .sun { color: #267a80; }
+.compact-hud.submerged .weather { display: flex; position: static; transform: none; padding: 6px 10px; font-size: 12px; }
+.compact-hud.submerged .weather .sun, .compact-hud.submerged #weather-name, .compact-hud.submerged .divider { display: none; }
+.submerged #zone { opacity: 1; }
